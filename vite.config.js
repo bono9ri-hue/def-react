@@ -5,7 +5,15 @@ import manifest from './manifest.json'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), crx({ manifest })],
+  plugins: [
+    react(), 
+    ...(!process.env.VERCEL ? [crx({ manifest })] : [])
+  ],
+  resolve: process.env.VERCEL ? {
+    alias: {
+      '@clerk/chrome-extension': '@clerk/react'
+    }
+  } : {},
   server: {
     port: 5173,
     strictPort: true,
