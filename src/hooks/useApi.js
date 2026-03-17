@@ -77,6 +77,13 @@ export function useApi() {
   const getCollections = useCallback(async () => {
     return fetchWithAuth('/collections');
   }, [fetchWithAuth]);
+
+  const saveCollection = useCallback(async (name) => {
+    return fetchWithAuth('/collections', {
+      method: "POST",
+      body: JSON.stringify({ name })
+    });
+  }, [fetchWithAuth]);
   
   const uploadFile = useCallback(async (file) => {
     const formData = new FormData();
@@ -94,6 +101,7 @@ export function useApi() {
     saveBookmark,
     getBookmarks,
     getCollections,
+    saveCollection,
     uploadFile
   };
 }

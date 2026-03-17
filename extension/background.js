@@ -55,15 +55,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
    ========================================== */
 function handleMessage(request, sender, sendResponse) {
   if (request.action === "set-token") {
-    chrome.storage.local.set({ def_session_token: request.token }, () => {
+    chrome.storage.local.set({ def_token: request.token }, () => {
       sendResponse({ status: "success" });
     });
     return true; 
   }
 
   if (request.action === "get-clerk-token") {
-    chrome.storage.local.get(['def_session_token'], (result) => {
-      sendResponse({ token: result.def_session_token || null });
+    chrome.storage.local.get(['def_token'], (result) => {
+      sendResponse({ token: result.def_token || null });
     });
     return true; 
   }
