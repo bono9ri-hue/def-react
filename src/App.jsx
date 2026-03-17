@@ -202,14 +202,14 @@ function Dashboard() {
             
             {/* 1️⃣ Bookmark Area (Speed Dial - Circular Icons) */}
             <div className="mb-12 flex justify-center">
-               <div className="w-full max-w-[700px]">
+               <div className="w-full max-w-[600px]">
                  <div className="flex items-center justify-between mb-4 px-1">
                    <h3 className="text-[13px] font-black tracking-tight flex items-center gap-2">
                      <Bookmark size={14} className="text-contentMuted"/> 바로가기
                    </h3>
                    <button className="text-[11px] font-bold text-contentMuted hover:text-content">전체보기</button>
                  </div>
-                  <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+                  <div className="flex flex-wrap gap-4 justify-center">
                     {bookmarks.slice(0, 8).map(bm => (
                       <div 
                         key={bm.id} 
