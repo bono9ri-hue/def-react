@@ -9,11 +9,16 @@ export default {
     extend: {
       colors: {
         background: 'var(--bg-primary)',
-        surface: 'var(--bg-secondary)',
-        surfaceHover: 'var(--bg-tertiary)',
+        sidebar: 'var(--bg-sidebar)',
+        surface: 'var(--bg-surface)',
+        hover: 'var(--bg-hover)',
         border: 'var(--border-color)',
         content: 'var(--text-primary)',
-        contentMuted: 'var(--text-muted)'
+        contentMuted: 'var(--text-muted)',
+        accent: {
+          main: 'var(--accent-main)',
+          fg: 'var(--accent-fg)',
+        }
       },
       boxShadow: {
         'minimal': '0 2px 8px rgba(0, 0, 0, 0.04)',

@@ -26,7 +26,7 @@ import {
 
 function Dashboard() {
   const { isLoaded, userId, getToken } = useAuth();
-  const { sendMessageToContentScript, showToast } = useToast();
+  const { showToast } = useToast();
   const { getActiveTab } = useExtensionAction();
   const { getAssets, getBookmarks, getCollections, saveCollection } = useApi();
   

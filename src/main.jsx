@@ -14,7 +14,6 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ClerkProvider 
       publishableKey={PUBLISHABLE_KEY} 
-      syncHost="https://deference.work" 
       afterSignOutUrl="/"
     >
       <App />

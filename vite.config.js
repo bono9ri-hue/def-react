@@ -7,13 +7,13 @@ import manifest from './extension/manifest.json'
 export default defineConfig({
   plugins: [
     react(), 
-    ...(!process.env.VERCEL ? [crx({ manifest })] : [])
+    // ...(!process.env.VERCEL ? [crx({ manifest })] : [])
   ],
-  resolve: process.env.VERCEL ? {
+  resolve: {
     alias: {
       '@clerk/chrome-extension': '@clerk/react'
     }
-  } : {},
+  },
   server: {
     port: 5173,
     strictPort: true,
