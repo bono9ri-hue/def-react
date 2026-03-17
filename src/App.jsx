@@ -21,7 +21,12 @@ import {
   Filter,
   ArrowUpDown,
   Tag,
-  LogOut
+  LogOut,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  Minus,
+  RefreshCw
 } from 'lucide-react';
 
 function Dashboard() {
@@ -52,7 +57,11 @@ function Dashboard() {
   // 🔖 Bookmark Edit Modal States
   const [isBookmarkModalOpen, setIsBookmarkModalOpen] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState(null);
-  const [bmForm, setBmForm] = useState({ name: '', url: '', color: '#ffffff', scale: 1.0 });
+  const [bmForm, setBmForm] = useState({ 
+    name: '', url: '', color: '#ffffff', scale: 1.0, 
+    isTransparent: true, 
+    offset_x: 0, offset_y: 0 // 🌟 미세 조정 좌표 추가
+  });
 
   // 🔃 Drag and Drop State
   const [draggedIdx, setDraggedIdx] = useState(null);
@@ -60,10 +69,18 @@ function Dashboard() {
   const openBookmarkModal = (bm = null) => {
     if (bm) {
       setEditingBookmark(bm);
-      setBmForm({ name: bm.name, url: bm.url, color: bm.icon_value === 'transparent' ? '#ffffff' : (bm.icon_value || '#ffffff'), scale: bm.icon_scale || 1.0, isTransparent: bm.icon_value === 'transparent' });
+      setBmForm({ 
+        name: bm.name, 
+        url: bm.url, 
+        color: bm.icon_value === 'transparent' ? '#ffffff' : (bm.icon_value || '#ffffff'), 
+        scale: bm.icon_scale || 1.0, 
+        isTransparent: bm.icon_value === 'transparent',
+        offset_x: bm.icon_offset_x || 0, // 🌟 복원
+        offset_y: bm.icon_offset_y || 0  // 🌟 복원
+      });
     } else {
       setEditingBookmark(null);
-      setBmForm({ name: '', url: '', color: '#ffffff', scale: 1.0, isTransparent: true });
+      setBmForm({ name: '', url: '', color: '#ffffff', scale: 1.0, isTransparent: true, offset_x: 0, offset_y: 0 });
     }
     setIsBookmarkModalOpen(true);
   };
@@ -269,7 +286,9 @@ function Dashboard() {
                              src={`https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=128`}
                              className="w-full h-full object-cover transition-all z-10 pointer-events-none"
                              draggable={false}
-                             style={{ transform: `scale(${bm.icon_scale || 1.0})` }}
+                             style={{ 
+                               transform: `scale(${bm.icon_scale || 1.0}) translate(${bm.icon_offset_x || 0}px, ${bm.icon_offset_y || 0}px)` 
+                             }}
                              alt={bm.name}
                            />
                            {bm.icon_value !== 'transparent' && <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />}
@@ -455,44 +474,79 @@ function Dashboard() {
                   url: bmForm.url.startsWith('http') ? bmForm.url : `https://${bmForm.url}`,
                   icon_value: bmForm.isTransparent ? 'transparent' : bmForm.color,
                   icon_scale: bmForm.scale,
-                  icon_type: 'color' // 🌟 필수 필드 추가
+                  icon_offset_x: bmForm.offset_x, // 🌟 추가
+                  icon_offset_y: bmForm.offset_y, // 🌟 추가
+                  icon_type: 'color'
                 };
                 try {
                   if (editingBookmark) {
                     await updateBookmark(editingBookmark.id, data);
+                    showToast("북마크가 수정되었습니다.", "success");
                   } else {
                     await saveBookmark(data);
+                    showToast("북마크가 추가되었습니다.", "success");
                   }
-                  showToast("저장 완료!", "success");
                   setIsBookmarkModalOpen(false);
                   fetchData();
-                } catch(err) { 
-                  console.error("Bookmark Save Error:", err);
-                  showToast("저장에 실패했습니다.", "error"); 
+                } catch (err) {
+                  showToast("저장에 실패했습니다.", "error");
                 }
-              }} className="flex flex-col gap-5">
-                
-                {/* 🌟 Real-time Preview Area */}
-                <div className="flex flex-col items-center justify-center p-6 bg-sidebar rounded-2xl border border-dashed border-border mb-2">
-                   <span className="text-[9px] font-black text-contentMuted uppercase mb-4 tracking-widest">실시간 미리보기</span>
-                   <div 
-                      className="w-16 h-16 rounded-full shadow-lg flex items-center justify-center relative overflow-hidden transition-all duration-200"
-                      style={{ backgroundColor: bmForm.isTransparent ? 'transparent' : bmForm.color, border: bmForm.isTransparent ? '1px dashed var(--border-color)' : 'none' }}
-                   >
-                     {bmForm.url ? (
-                       <img 
-                         src={`https://www.google.com/s2/favicons?domain=${bmForm.url.includes('.') ? (bmForm.url.startsWith('http') ? new URL(bmForm.url).hostname : bmForm.url) : 'google.com'}&sz=128`}
-                         className="w-full h-full object-cover z-10"
-                         style={{ transform: `scale(${bmForm.scale})` }}
-                         alt="Preview"
-                         onError={(e) => { e.target.src = 'https://www.google.com/s2/favicons?domain=google.com&sz=128'; }}
-                       />
-                     ) : (
-                       <Plus size={24} className="text-contentMuted opacity-20"/>
-                     )}
-                     {!bmForm.isTransparent && <div className="absolute inset-0 bg-black/5" />}
+              }} className="flex flex-col gap-4">
+                {/* 🌟 Real-time Preview Area with Fine Controls */}
+                <div className="flex flex-col items-center justify-center p-6 bg-sidebar rounded-2xl border border-dashed border-border mb-2 relative group/preview">
+                   <span className="text-[9px] font-black text-contentMuted uppercase mb-4 tracking-widest">미세 조정 및 미리보기</span>
+                   
+                   <div className="relative">
+                     {/* Circular Container */}
+                     <div 
+                        className="w-20 h-20 rounded-full shadow-lg flex items-center justify-center relative overflow-hidden transition-all duration-200 border-2 border-border"
+                        style={{ backgroundColor: bmForm.isTransparent ? 'transparent' : bmForm.color }}
+                     >
+                       {bmForm.url ? (
+                         <img 
+                           src={`https://www.google.com/s2/favicons?domain=${bmForm.url.includes('.') ? (bmForm.url.startsWith('http') ? new URL(bmForm.url).hostname : bmForm.url) : 'google.com'}&sz=128`}
+                           className="w-full h-full object-cover z-10"
+                           style={{ transform: `scale(${bmForm.scale}) translate(${bmForm.offset_x}px, ${bmForm.offset_y}px)` }}
+                           alt="Preview"
+                           onError={(e) => { e.target.src = 'https://www.google.com/s2/favicons?domain=google.com&sz=128'; }}
+                         />
+                       ) : (
+                         <Plus size={24} className="text-contentMuted opacity-20"/>
+                       )}
+                       {!bmForm.isTransparent && <div className="absolute inset-0 bg-black/5" />}
+                     </div>
+
+                     {/* 🕹️ Directional Controls (Overlays) */}
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y - 2})} className="absolute -top-6 left-1/2 -translate-x-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                       <ChevronUp size={12}/>
+                     </button>
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y + 2})} className="absolute -bottom-6 left-1/2 -translate-x-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                       <ChevronDown size={12}/>
+                     </button>
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x - 2})} className="absolute -left-6 top-1/2 -translate-y-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                       <ChevronLeft size={12}/>
+                     </button>
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x + 2})} className="absolute -right-6 top-1/2 -translate-y-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                       <ChevronRight size={12}/>
+                     </button>
+
+                     {/* 🔍 Zoom Controls (Corner) */}
+                     <div className="absolute -bottom-2 -right-8 flex flex-col gap-1 z-20">
+                       <button type="button" onClick={() => setBmForm({...bmForm, scale: Math.min(2.5, bmForm.scale + 0.1)})} className="p-1 bg-content text-background rounded-md shadow-md hover:scale-110 transition-all">
+                         <Plus size={10}/>
+                       </button>
+                       <button type="button" onClick={() => setBmForm({...bmForm, scale: Math.max(0.3, bmForm.scale - 0.1)})} className="p-1 bg-sidebar border border-border rounded-md shadow-md hover:scale-110 transition-all">
+                         <Minus size={10}/>
+                       </button>
+                     </div>
+                     
+                     {/* 🔄 Reset Button */}
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: 0, offset_y: 0, scale: 1.0})} className="absolute -top-2 -right-8 p-1 bg-sidebar border border-border rounded-md shadow-sm hover:text-red-500 transition-all z-20" title="초기화">
+                       <RefreshCw size={10}/>
+                     </button>
                    </div>
-                   <span className="text-[10px] font-bold text-contentMuted mt-3">{bmForm.name || "북마크 이름"}</span>
+                   
+                   <span className="text-[10px] font-bold text-contentMuted mt-10">{bmForm.name || "북마크 이름"}</span>
                 </div>
 
                 <div className="space-y-1.5">
