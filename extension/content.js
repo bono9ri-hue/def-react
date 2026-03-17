@@ -1,11 +1,14 @@
-// 🌟 [핵심 추가] 요원이 이미 투입되어 있는지 확인하는 방어막
-if (!window.hasDefContentScriptRun) {
-    window.hasDefContentScriptRun = true;
+// 🌟 [핵심 수정] 요원이 이미 투입되어 있는지 확인하지만, 리스너는 항상 최신화할 수 있게 조절
+if (window.hasDefContentScriptRun) {
+    console.log("Deference: 요원이 이미 투입된 상태입니다. 통신 채널을 재점검합니다.");
+}
+window.hasDefContentScriptRun = true;
+
+console.log("Deference: 수집 요원(Content Script)이 현장에 도착했습니다! 🕵️‍♂️");
 
 /* ==========================================
    [섹션 1] 전역 변수 및 설정
    ========================================== */
-// 🚀 수파베이스 흔적 완벽 삭제! 이제 우리 워커 서버만 바라봅니다.
 const WORKER_URL = "https://def-api.deference.workers.dev";
 
 let lastRightClickData = null;
@@ -1034,8 +1037,6 @@ async function executeFullPageCapture() {
     const finalDataUrl = canvas.toDataURL('image/jpeg', 0.9);
     showPreSaveModal(finalDataUrl, null, getCleanUrl(window.location.href));
 }
-
-} // 🌟 방어막 닫기
 
 // 🔑 로그인 토큰 자동 동기화 엔진 (최종 방탄 버전 🛡️)
 let defSyncInterval = null;

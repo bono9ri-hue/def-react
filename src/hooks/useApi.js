@@ -59,11 +59,19 @@ export function useApi() {
     });
   }, [fetchWithAuth]);
 
+  const getAssets = useCallback(async () => {
+    return fetchWithAuth('/assets');
+  }, [fetchWithAuth]);
+
   const saveBookmark = useCallback(async (bookmarkData) => {
     return fetchWithAuth('/bookmarks', {
       method: "POST",
       body: JSON.stringify(bookmarkData)
     });
+  }, [fetchWithAuth]);
+
+  const getBookmarks = useCallback(async () => {
+    return fetchWithAuth('/bookmarks');
   }, [fetchWithAuth]);
 
   const getCollections = useCallback(async () => {
@@ -82,7 +90,9 @@ export function useApi() {
   return {
     fetchWithAuth,
     saveAsset,
+    getAssets,
     saveBookmark,
+    getBookmarks,
     getCollections,
     uploadFile
   };
