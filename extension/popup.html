@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deference Capture</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- SVG Icons from Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-area">
+                <div class="logo-box">DEF</div>
+                <span class="logo-text">Deference</span>
+            </div>
+            <button id="theme-toggle" class="icon-btn" title="Toggle Theme">
+                <i data-lucide="moon" class="theme-icon dark-only"></i>
+                <i data-lucide="sun" class="theme-icon light-only"></i>
+            </button>
+        </header>
+
+        <!-- Main Actions -->
+        <main class="actions-grid">
+            <button id="btn-capture-area" class="action-btn">
+                <div class="icon-wrapper"><i data-lucide="crop"></i></div>
+                <div class="btn-text">Capture Area</div>
+            </button>
+            
+            <button id="btn-capture-visible" class="action-btn">
+                <div class="icon-wrapper"><i data-lucide="monitor"></i></div>
+                <div class="btn-text">Visible Screen</div>
+            </button>
+        </main>
+
+        <!-- List Actions -->
+        <div class="actions-list">
+            <button id="btn-batch-archive" class="list-btn">
+                <i data-lucide="layers" class="list-icon"></i>
+                <div class="list-text">
+                    <span class="title">Batch Archive</span>
+                    <span class="subtitle">Save multiple media</span>
+                </div>
+            </button>
+
+            <button id="btn-save-bookmark" class="list-btn">
+                <i data-lucide="bookmark" class="list-icon"></i>
+                <div class="list-text">
+                    <span class="title">Save Bookmark</span>
+                    <span class="subtitle">Pin to speed dial</span>
+                </div>
+            </button>
+            
+            <button id="btn-save-link" class="list-btn">
+                <i data-lucide="link" class="list-icon"></i>
+                <div class="list-text">
+                    <span class="title">Save Link</span>
+                    <span class="subtitle">Archive current page</span>
+                </div>
+            </button>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <a href="https://deference.work" target="_blank" class="footer-link">Open Gallery ↗</a>
+        </footer>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

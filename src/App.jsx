@@ -20,23 +20,23 @@ function PopupContent() {
 
   if (!isLoaded) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      <div className="flex-1 flex items-center justify-center p-8 bg-background">
+        <div className="w-5 h-5 border-2 border-content/10 border-t-content rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!userId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-6 shadow-2xl">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+      <div className="flex-1 flex flex-col items-center justify-center p-10 text-center bg-background">
+        <div className="w-14 h-14 bg-surface border border-border rounded-xl flex items-center justify-center mb-6 shadow-minimal dark:shadow-minimal-dark">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-content">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
         </div>
-        <h2 className="text-xl font-bold mb-2">Deference Archive</h2>
-        <p className="text-sm text-gray-400 mb-8">
-          Sign in to access your digital collection and powerful capture tools.
+        <h2 className="text-lg font-bold mb-2 tracking-tight">Deference Archive</h2>
+        <p className="text-[13px] text-contentMuted mb-8 max-w-[200px] leading-relaxed">
+          Sign in to access your digital collection and capture tools.
         </p>
         <SignInButton mode="modal" fallbackRedirectUrl="/">
           <Button variant="primary" className="w-full">
@@ -78,89 +78,86 @@ function PopupContent() {
       });
       
       showToast("Bookmark saved! 📌", "success");
-      setTimeout(() => window.close(), 1500);
+      setTimeout(() => window.close(), 1200);
     } catch (e) {
       showToast("Failed to save bookmark", "error");
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0a]">
+    <div className="flex flex-col h-full bg-background selection:bg-content/10">
       {/* Header */}
-      <header className="flex items-center justify-between p-4 border-b border-white/5 bg-[#141414]/80 backdrop-blur-xl shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-white rounded-md flex items-center justify-center">
-            <span className="text-black font-extrabold text-[10px] tracking-tighter">DEF</span>
+      <header className="flex items-center justify-between px-5 py-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex items-center gap-2.5">
+          <div className="w-5 h-5 bg-content text-background rounded-[4px] flex items-center justify-center shadow-sm">
+            <span className="font-black text-[9px] tracking-tighter">DEF</span>
           </div>
-          <span className="font-semibold text-sm tracking-tight">Deference</span>
+          <span className="font-bold text-[14px] tracking-tight">Deference</span>
         </div>
-        <UserButton appearance={{ elements: { avatarBox: "w-7 h-7" } }} />
+        <UserButton appearance={{ elements: { avatarBox: "w-7 h-7 border border-border", userButtonTrigger: "focus:shadow-none" } }} />
       </header>
 
       {/* Main Actions Grid */}
-      <main className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+      <main className="flex-1 overflow-y-auto p-5 flex flex-col gap-6">
         
         {/* Capture Section */}
         <div className="grid grid-cols-2 gap-3">
           <button 
             onClick={handleCaptureArea}
-            className="flex flex-col items-center justify-center gap-3 p-4 bg-[#141414] hover:bg-[#1f1f1f] rounded-2xl border border-white/5 transition-all focus:ring-2 focus:ring-white/20 group"
+            className="flex flex-col items-center justify-center gap-3.5 p-5 bg-surface hover:bg-surfaceHover rounded-xl border border-border transition-all group"
           >
-            <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all">
-              <Camera size={20} />
+            <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center group-hover:bg-content group-hover:text-background transition-colors">
+              <Camera size={15} strokeWidth={2.5} />
             </div>
-            <span className="text-sm font-medium text-gray-200">Capture Area</span>
+            <span className="text-[12px] font-semibold text-content">Capture Area</span>
           </button>
           
           <button 
             onClick={handleCaptureVisible}
-            className="flex flex-col items-center justify-center gap-3 p-4 bg-[#141414] hover:bg-[#1f1f1f] rounded-2xl border border-white/5 transition-all focus:ring-2 focus:ring-white/20 group"
+            className="flex flex-col items-center justify-center gap-3.5 p-5 bg-surface hover:bg-surfaceHover rounded-xl border border-border transition-all group"
           >
-            <div className="w-10 h-10 rounded-full bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:scale-110 group-hover:bg-purple-500 group-hover:text-white transition-all">
-              <Monitor size={20} />
+            <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center group-hover:bg-content group-hover:text-background transition-colors">
+              <Monitor size={15} strokeWidth={2.5} />
             </div>
-            <span className="text-sm font-medium text-gray-200">Visible Screen</span>
+            <span className="text-[12px] font-semibold text-content">Visible Screen</span>
           </button>
         </div>
 
         {/* List Actions */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           <button 
             onClick={handleBatchSave}
-            className="flex items-center gap-3 p-4 bg-[#141414] hover:bg-[#1f1f1f] rounded-xl border border-white/5 transition-all group"
+            className="flex items-center gap-4 p-4 bg-transparent hover:bg-surface rounded-lg transition-all group"
           >
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-              <Layers size={18} />
+            <div className="w-7 h-7 flex items-center justify-center text-contentMuted group-hover:text-content">
+              <Layers size={16} />
             </div>
             <div className="flex-1 text-left">
-              <div className="text-sm font-medium text-white">Batch Archive</div>
-              <div className="text-xs text-gray-500">Save multiple images/videos</div>
+              <div className="text-[13px] font-semibold text-content">Batch Archive</div>
+              <div className="text-[11px] text-contentMuted">Save multiple items</div>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600 group-hover:text-white group-hover:translate-x-1 transition-transform">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
           </button>
 
           <button 
             onClick={handleSaveBookmark}
-            className="flex items-center gap-3 p-4 bg-[#141414] hover:bg-[#1f1f1f] rounded-xl border border-white/5 transition-all group"
+            className="flex items-center gap-4 p-4 bg-transparent hover:bg-surface rounded-lg transition-all group"
           >
-            <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-400 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-colors">
-              <Bookmark size={18} />
+            <div className="w-7 h-7 flex items-center justify-center text-contentMuted group-hover:text-content">
+              <Bookmark size={16} />
             </div>
             <div className="flex-1 text-left">
-              <div className="text-sm font-medium text-white">Save Bookmark</div>
-              <div className="text-xs text-gray-500">Pin to Speed Dial</div>
+              <div className="text-[13px] font-semibold text-content">Save Bookmark</div>
+              <div className="text-[11px] text-contentMuted">Pin to Speed Dial</div>
             </div>
           </button>
 
-          <button className="flex items-center gap-3 p-4 bg-[#141414] hover:bg-[#1f1f1f] rounded-xl border border-white/5 transition-all group">
-            <div className="w-8 h-8 rounded-lg bg-pink-500/10 text-pink-400 flex items-center justify-center group-hover:bg-pink-500 group-hover:text-white transition-colors">
-              <LinkIcon size={18} />
+          <button className="flex items-center gap-4 p-4 bg-transparent hover:bg-surface rounded-lg transition-all group">
+            <div className="w-7 h-7 flex items-center justify-center text-contentMuted group-hover:text-content">
+              <LinkIcon size={16} />
             </div>
             <div className="flex-1 text-left">
-              <div className="text-sm font-medium text-white">Save Link</div>
-              <div className="text-xs text-gray-500">Archive current page</div>
+              <div className="text-[13px] font-semibold text-content">Save Link</div>
+              <div className="text-[11px] text-contentMuted">Archive current page</div>
             </div>
           </button>
         </div>
@@ -168,17 +165,16 @@ function PopupContent() {
       </main>
 
       {/* Footer */}
-      <footer className="p-4 text-center border-t border-white/5 shrink-0">
+      <footer className="p-5 text-center border-t border-border shrink-0">
         <a 
           href="https://deference.work" 
           target="_blank" 
           rel="noreferrer"
-          className="text-xs font-medium text-gray-500 hover:text-white transition-colors"
+          className="text-[11px] font-semibold text-contentMuted hover:text-content transition-colors"
         >
-          Open Deference Gallery ↗
+          Open Gallery ↗
         </a>
       </footer>
-
     </div>
   );
 }

@@ -5,7 +5,7 @@ export const Card = ({ className, children, ...props }) => {
   return (
     <div 
       className={cn(
-        "bg-[#141414]/80 backdrop-blur-xl border border-white/5 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)] transition-all duration-300 hover:border-white/10",
+        "bg-surface border border-border rounded-xl overflow-hidden shadow-sm transition-all duration-200 hover:border-text-muted/30",
         className
       )}
       {...props}
@@ -17,7 +17,7 @@ export const Card = ({ className, children, ...props }) => {
 
 export const CardHeader = ({ className, children, ...props }) => {
   return (
-    <div className={cn("p-4 border-b border-white/5", className)} {...props}>
+    <div className={cn("p-5 border-b border-border", className)} {...props}>
       {children}
     </div>
   );
@@ -25,7 +25,7 @@ export const CardHeader = ({ className, children, ...props }) => {
 
 export const CardBody = ({ className, children, ...props }) => {
   return (
-    <div className={cn("p-4", className)} {...props}>
+    <div className={cn("p-5", className)} {...props}>
       {children}
     </div>
   );
@@ -33,7 +33,7 @@ export const CardBody = ({ className, children, ...props }) => {
 
 export const CardFooter = ({ className, children, ...props }) => {
   return (
-    <div className={cn("p-4 bg-black/20 border-t border-white/5 flex items-center", className)} {...props}>
+    <div className={cn("p-4 bg-surface/50 border-t border-border flex items-center", className)} {...props}>
       {children}
     </div>
   );

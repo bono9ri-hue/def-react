@@ -3,7 +3,6 @@ import { cn } from './Button';
 
 export const Dialog = ({ isOpen, onClose, title, children, className }) => {
   
-  // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -17,33 +16,31 @@ export const Dialog = ({ isOpen, onClose, title, children, className }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-black/40 dark:bg-black/80 animate-in fade-in duration-150"
         onClick={onClose}
       />
       
-      {/* Modal View */}
       <div 
         className={cn(
-          "relative w-[90%] max-w-[400px] bg-[#111] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200",
+          "relative w-full max-w-[400px] bg-background border border-border rounded-xl shadow-minimal dark:shadow-minimal-dark overflow-hidden animate-in zoom-in-95 duration-200",
           className
         )}
       >
-        <div className="flex items-center justify-between p-4 border-b border-white/5">
-          <h2 className="text-lg font-semibold text-white tracking-tight">{title}</h2>
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <h2 className="text-[15px] font-semibold text-content tracking-tight">{title}</h2>
           <button 
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="p-1.5 text-contentMuted hover:text-content hover:bg-surface rounded-lg transition-colors"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 6L6 18M6 6l12 12"/>
             </svg>
           </button>
         </div>
         
-        <div className="p-4">
+        <div className="p-5">
           {children}
         </div>
       </div>
