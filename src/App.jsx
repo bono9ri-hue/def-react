@@ -217,12 +217,12 @@ function Dashboard() {
                       className="group flex flex-col items-center gap-2 w-[72px] cursor-pointer"
                     >
                       <div 
-                        className="w-14 h-14 rounded-full border border-border shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden"
+                        className="w-14 h-14 rounded-full border border-border shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden p-2"
                         style={{ backgroundColor: bm.icon_value === 'transparent' ? 'transparent' : (bm.icon_value || 'var(--bg-surface)') }}
                       >
                          <img 
-                           src={`https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=64`}
-                           className="w-7 h-7 rounded-[4px] transition-all z-10"
+                           src={`https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=128`}
+                           className="w-full h-full object-contain transition-all z-10"
                            style={{ transform: `scale(${bm.icon_scale || 1.0})` }}
                            alt={bm.name}
                          />
