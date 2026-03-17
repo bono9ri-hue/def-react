@@ -24,14 +24,46 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     const getToken = () => new Promise(resolve => 
-        chrome.runtime.sendMessage({ action: 'get-clerk-token' }, res => resolve(res ? res.token : null))
+        chrome.runtime.sendMessage({ action: 'get-clerk-token' }, res => {
+            if (chrome.runtime.lastError) {
+                console.warn("Token fetch failed:", chrome.runtime.lastError.message);
+                resolve(null);
+            } else {
+                resolve(res ? res.token : null);
+            }
+        })
     );
+
+    const ensureContentScript = async (tabId) => {
+        return new Promise((resolve) => {
+            chrome.tabs.sendMessage(tabId, { action: 'ping' }, (response) => {
+                if (chrome.runtime.lastError || !response) {
+                    // Script not loaded, inject it
+                    chrome.scripting.executeScript({
+                        target: { tabId: tabId },
+                        files: ['content.js']
+                    }, () => {
+                        chrome.scripting.insertCSS({
+                            target: { tabId: tabId },
+                            files: ['content.css']
+                        }, () => {
+                            setTimeout(() => resolve(true), 200); // Small delay for listener registration
+                        });
+                    });
+                } else {
+                    resolve(true); // Already loaded
+                }
+            });
+        });
+    };
 
     const WORKER_URL = "https://def-api.deference.workers.dev";
 
     // Actions
     document.getElementById('btn-capture-area').addEventListener('click', async () => {
         const tab = await getActiveTab();
+        if (!tab || tab.url.startsWith('chrome://')) return;
+        await ensureContentScript(tab.id);
         chrome.tabs.sendMessage(tab.id, { action: 'start-selection' });
         window.close();
     });
@@ -43,6 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-batch-archive').addEventListener('click', async () => {
         const tab = await getActiveTab();
+        if (!tab || tab.url.startsWith('chrome://')) return;
+        await ensureContentScript(tab.id);
         chrome.tabs.sendMessage(tab.id, { action: 'open-batch-save' });
         window.close();
     });
@@ -53,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const token = await getToken();
         
         if (!token) {
-            alert("Please log in on deference.work first!");
+            alert("No session found! Please open https://deference.work and log in first.");
             window.open("https://deference.work");
             return;
         }
@@ -63,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saving...</span>`;
 
         try {
-            await fetch(`${WORKER_URL}/bookmarks`, {
+            const res = await fetch(`${WORKER_URL}/bookmarks`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({
@@ -74,8 +108,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     icon_scale: 1.0
                 })
             });
-            btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saved! 📌</span>`;
-            setTimeout(() => window.close(), 1000);
+            if (res.ok) {
+                btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saved! 📌</span>`;
+                setTimeout(() => window.close(), 1000);
+            } else {
+                throw new Error("API failed");
+            }
         } catch (e) {
             btn.innerHTML = originalHtml;
             alert("Failed to save bookmark.");
@@ -88,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const token = await getToken();
         
         if (!token) {
-            alert("Please log in on deference.work first!");
+            alert("No session found! Please open https://deference.work and log in first.");
             window.open("https://deference.work");
             return;
         }
@@ -98,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saving...</span>`;
 
         try {
-            await fetch(`${WORKER_URL}/assets`, {
+            const res = await fetch(`${WORKER_URL}/assets`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({
@@ -110,8 +148,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     item_type: "link"
                 })
             });
-            btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saved! 🔗</span>`;
-            setTimeout(() => window.close(), 1000);
+            if (res.ok) {
+                btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saved! 🔗</span>`;
+                setTimeout(() => window.close(), 1000);
+            } else {
+                throw new Error("API failed");
+            }
         } catch (e) {
             btn.innerHTML = originalHtml;
             alert("Failed to save link.");

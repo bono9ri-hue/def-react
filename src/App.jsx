@@ -13,10 +13,23 @@ import {
 } from 'lucide-react';
 
 function PopupContent() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId, getToken } = useAuth(); // Added getToken
   const { sendMessageToContentScript, sendMessageToBackground, getActiveTab } = useExtensionAction();
   const { showToast } = useToast();
   const { saveBookmark } = useApi();
+
+  // 📡 Sync token with extension when logged in
+  React.useEffect(() => {
+    if (isLoaded && userId) {
+      getToken().then(token => {
+        if (token) {
+          window.dispatchEvent(new CustomEvent('def-login-sync', { 
+            detail: { token } 
+          }));
+        }
+      });
+    }
+  }, [isLoaded, userId, getToken]);
 
   if (!isLoaded) {
     return (

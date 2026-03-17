@@ -188,6 +188,10 @@ document.addEventListener("contextmenu", (e) => {
    [섹션 7] 통신: 백그라운드 메시지 수신 및 분기
    ========================================== */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "ping") {
+        sendResponse({ status: "ok" });
+        return true;
+    }
     if (request.action === "direct-collect") handleDirectCollect(request);
     else if (request.action === "start-selection") startSelection(); 
     else if (request.action === "crop-and-upload") cropAndUpload(request.fullDataUrl, request.rect); 
