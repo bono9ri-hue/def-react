@@ -474,8 +474,8 @@ function Dashboard() {
                   url: bmForm.url.startsWith('http') ? bmForm.url : `https://${bmForm.url}`,
                   icon_value: bmForm.isTransparent ? 'transparent' : bmForm.color,
                   icon_scale: bmForm.scale,
-                  icon_offset_x: bmForm.offset_x, // 🌟 추가
-                  icon_offset_y: bmForm.offset_y, // 🌟 추가
+                  icon_offset_x: bmForm.offset_x,
+                  icon_offset_y: bmForm.offset_y,
                   icon_type: 'color'
                 };
                 try {
@@ -492,60 +492,57 @@ function Dashboard() {
                   showToast("저장에 실패했습니다.", "error");
                 }
               }} className="flex flex-col gap-4">
+                
                 {/* 🌟 Real-time Preview Area with Fine Controls */}
-                <div className="flex flex-col items-center justify-center p-6 bg-sidebar rounded-2xl border border-dashed border-border mb-2 relative group/preview">
-                   <span className="text-[9px] font-black text-contentMuted uppercase mb-4 tracking-widest">미세 조정 및 미리보기</span>
+                <div className="flex flex-col items-center justify-center p-6 bg-sidebar rounded-2xl border border-dashed border-border mb-2 relative h-52 group/preview">
+                   <span className="text-[9px] font-black text-contentMuted uppercase tracking-widest absolute top-4 left-1/2 -translate-x-1/2">미세 조정 및 미리보기</span>
                    
-                   <div className="relative">
-                     {/* Circular Container */}
-                     <div 
-                        className="w-20 h-20 rounded-full shadow-lg flex items-center justify-center relative overflow-hidden transition-all duration-200 border-2 border-border"
-                        style={{ backgroundColor: bmForm.isTransparent ? 'transparent' : bmForm.color }}
-                     >
-                       {bmForm.url ? (
-                         <img 
-                           src={`https://www.google.com/s2/favicons?domain=${bmForm.url.includes('.') ? (bmForm.url.startsWith('http') ? new URL(bmForm.url).hostname : bmForm.url) : 'google.com'}&sz=128`}
-                           className="w-full h-full object-cover z-10"
-                           style={{ transform: `scale(${bmForm.scale}) translate(${bmForm.offset_x}px, ${bmForm.offset_y}px)` }}
-                           alt="Preview"
-                           onError={(e) => { e.target.src = 'https://www.google.com/s2/favicons?domain=google.com&sz=128'; }}
-                         />
-                       ) : (
-                         <Plus size={24} className="text-contentMuted opacity-20"/>
-                       )}
-                       {!bmForm.isTransparent && <div className="absolute inset-0 bg-black/5" />}
-                     </div>
-
-                     {/* 🕹️ Directional Controls (Pushed to box borders) */}
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y - 0.5})} className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
-                       <ChevronUp size={14}/>
-                     </button>
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y + 0.5})} className="absolute bottom-12 left-1/2 -translate-x-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
-                       <ChevronDown size={14}/>
-                     </button>
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x - 0.5})} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
-                       <ChevronLeft size={14}/>
-                     </button>
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x + 0.5})} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
-                       <ChevronRight size={14}/>
-                     </button>
-
-                     {/* 🔄 Reset Button (Extreme Top Right) */}
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: 0, offset_y: 0, scale: 1.0})} className="absolute top-2 right-2 p-1.5 bg-background border border-border rounded-md shadow-sm hover:text-red-500 transition-all z-20" title="초기화">
-                       <RefreshCw size={12}/>
-                     </button>
-
-                     {/* 🔍 Integrated Scale Slider (Inside the box) */}
-                     <div className="absolute bottom-3 left-6 right-6 space-y-1">
-                        <div className="flex justify-between items-center px-1">
-                          <span className="text-[9px] font-black text-contentMuted uppercase">Scale</span>
-                          <span className="text-[9px] font-black">{bmForm.scale.toFixed(2)}x</span>
-                        </div>
-                        <input type="range" min="0.3" max="2.5" step="0.01" value={bmForm.scale} onChange={e=>setBmForm({...bmForm, scale: parseFloat(e.target.value)})} className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-content" />
-                     </div>
+                   {/* Centered Circular Icon Container */}
+                   <div 
+                      className="w-20 h-20 rounded-full shadow-lg flex items-center justify-center relative overflow-hidden transition-all duration-200 border-2 border-border"
+                      style={{ backgroundColor: bmForm.isTransparent ? 'transparent' : bmForm.color }}
+                   >
+                     {bmForm.url ? (
+                       <img 
+                         src={`https://www.google.com/s2/favicons?domain=${bmForm.url.includes('.') ? (bmForm.url.startsWith('http') ? new URL(bmForm.url).hostname : bmForm.url) : 'google.com'}&sz=128`}
+                         className="w-full h-full object-cover z-10"
+                         style={{ transform: `scale(${bmForm.scale}) translate(${bmForm.offset_x}px, ${bmForm.offset_y}px)` }}
+                         alt="Preview"
+                         onError={(e) => { e.target.src = 'https://www.google.com/s2/favicons?domain=google.com&sz=128'; }}
+                       />
+                     ) : (
+                       <Plus size={24} className="text-contentMuted opacity-20"/>
+                     )}
+                     {!bmForm.isTransparent && <div className="absolute inset-0 bg-black/5" />}
                    </div>
-                   
-                   <span className="text-[10px] font-bold text-contentMuted mt-4">{bmForm.name || "북마크 이름"}</span>
+
+                   {/* 🕹️ Directional Controls (Pushed to box borders - smaller) */}
+                   <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y - 0.5})} className="absolute top-10 left-1/2 -translate-x-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                     <ChevronUp size={12}/>
+                   </button>
+                   <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y + 0.5})} className="absolute bottom-4 left-1/2 -translate-x-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                     <ChevronDown size={12}/>
+                   </button>
+                   <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x - 0.5})} className="absolute left-4 top-1/2 -translate-y-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                     <ChevronLeft size={12}/>
+                   </button>
+                   <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x + 0.5})} className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                     <ChevronRight size={12}/>
+                   </button>
+
+                   {/* 🔄 Reset Button (Extreme Top Right - smaller) */}
+                   <button type="button" onClick={() => setBmForm({...bmForm, offset_x: 0, offset_y: 0, scale: 1.0})} className="absolute top-4 right-4 p-1.5 bg-background border border-border rounded-md shadow-sm hover:text-red-500 transition-all z-20" title="초기화">
+                     <RefreshCw size={12}/>
+                   </button>
+                </div>
+
+                {/* 🔍 Zoom Slider (Moved outside the box) */}
+                <div className="px-4 py-2 space-y-1.5 mb-2">
+                   <div className="flex justify-between items-center px-1">
+                     <span className="text-[10px] font-black text-contentMuted uppercase">Zoom</span>
+                     <span className="text-[10px] font-black">{bmForm.scale.toFixed(2)}x</span>
+                   </div>
+                   <input type="range" min="0.3" max="2.5" step="0.01" value={bmForm.scale} onChange={e=>setBmForm({...bmForm, scale: parseFloat(e.target.value)})} className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-content" />
                 </div>
 
                 <div className="space-y-1.5">
