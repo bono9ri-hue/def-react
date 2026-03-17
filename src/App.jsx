@@ -193,10 +193,7 @@ function Dashboard() {
       <main className="flex-1 flex flex-col h-full bg-primary relative overflow-hidden">
         
         {/* Scrollable Container */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          
-          {/* Header Padding Area (Transparent) */}
-          <div className="h-6 sticky top-0 bg-background/95 backdrop-blur-sm z-20" />
+        <div className="flex-1 overflow-y-auto custom-scrollbar pt-6">
 
           <div className="px-12 max-w-[1400px] mx-auto animate-slide-up">
             
