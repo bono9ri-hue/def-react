@@ -30,13 +30,27 @@ function Dashboard() {
   const { getActiveTab } = useExtensionAction();
   const { getAssets, getBookmarks, getCollections, saveCollection } = useApi();
   
-  const [activeTab, setActiveTab] = useState('home'); // home, all, gallery, bookmarks
+  const [activeTab, setActiveTab] = useState('home'); 
+  const [activeCollection, setActiveCollection] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [assets, setAssets] = useState([]);
   const [bookmarks, setBookmarks] = useState([]);
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
+
+  // 🔍 Filtered Data Logic
+  const filteredAssets = assets.filter(asset => {
+    const matchesSearch = asset.memo?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          asset.tags?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesTab = activeTab === 'all' || 
+                       (activeTab === 'gallery' && asset.image_url) ||
+                       (activeTab === 'home'); // Home shows everything for now
+    const matchesCollection = !activeCollection || asset.folder === activeCollection;
+    
+    return matchesSearch && matchesTab && matchesCollection;
+  });
 
   // 📡 Sync token with extension
   useEffect(() => {
@@ -117,8 +131,8 @@ function Dashboard() {
           </div>
 
           <nav className="flex flex-col gap-1">
-            <NavBtn active={activeTab === 'home'} onClick={() => setActiveTab('home')} icon={<Home size={16}/>} label="홈" />
-            <NavBtn active={activeTab === 'all'} onClick={() => setActiveTab('all')} icon={<Grid size={16}/>} label="전체 미디어" />
+            <NavBtn active={activeTab === 'home'} onClick={() => { setActiveTab('home'); setActiveCollection(null); }} icon={<Home size={16}/>} label="홈" />
+            <NavBtn active={activeTab === 'all'} onClick={() => { setActiveTab('all'); setActiveCollection(null); }} icon={<Grid size={16}/>} label="전체 미디어" />
           </nav>
 
           <div className="mt-8 mb-2 px-3">
@@ -136,7 +150,16 @@ function Dashboard() {
           </div>
           <nav className="flex flex-col gap-1 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
             {collections.map(col => (
-              <NavBtn key={col.id} icon={<FolderOpen size={16}/>} label={col.name} />
+              <NavBtn 
+                key={col.id} 
+                active={activeCollection === col.name}
+                onClick={() => {
+                  setActiveCollection(col.name);
+                  setActiveTab('collection');
+                }}
+                icon={<FolderOpen size={16}/>} 
+                label={col.name} 
+              />
             ))}
             {collections.length === 0 && <span className="px-3 py-2 text-[11px] text-contentMuted italic">생성된 컬렉션 없음</span>}
           </nav>
@@ -171,7 +194,7 @@ function Dashboard() {
                </div>
                <div className="flex flex-wrap gap-5">
                  {bookmarks.slice(0, 8).map(bm => (
-                   <div key={bm.id} className="group flex flex-col items-center gap-2 w-[72px] cursor-pointer">
+                   <div key={bm.id} onClick={() => window.open(bm.url, '_blank')} className="group flex flex-col items-center gap-2 w-[72px] cursor-pointer">
                      <div className="w-14 h-14 rounded-full bg-surface border border-border shadow-sm flex items-center justify-center group-hover:bg-content group-hover:text-background transition-all duration-300">
                         <img 
                           src={`https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=64`}
@@ -194,6 +217,8 @@ function Dashboard() {
                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-contentMuted group-focus-within:text-content transition-colors" size={20} />
                 <input 
                   type="text" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="디자인 라이브러리 검색..." 
                   className="w-full h-14 bg-surface border-2 border-border/50 rounded-2xl pl-14 pr-6 text-[15px] font-medium focus:outline-none focus:border-content/10 focus:ring-4 focus:ring-content/5 transition-all shadow-sm"
                 />
@@ -202,18 +227,29 @@ function Dashboard() {
 
             {/* 3️⃣ Favorites/Folder Suggestion Area */}
             <div className="mb-8 flex flex-wrap items-center gap-3">
-               <div className="px-4 py-2 bg-content text-background rounded-xl font-black text-[11px] shadow-lg">즐겨찾기</div>
+               <div 
+                 onClick={() => { setActiveTab('all'); setSearchQuery(''); setActiveCollection(null); }}
+                 className={`px-4 py-2 rounded-xl font-black text-[11px] shadow-lg cursor-pointer transition-all ${!searchQuery && activeTab === 'all' ? 'bg-content text-background scale-105' : 'bg-surface border border-border text-content hover:border-content/20'}`}
+               >
+                 전체보기
+               </div>
                {['브랜딩', 'UI 패턴', '아이콘', '영감'].map(tag => (
-                 <div key={tag} className="px-4 py-2 bg-surface border border-border rounded-xl text-[11px] font-bold hover:border-content/20 cursor-pointer transition-colors">{tag}</div>
+                 <div 
+                   key={tag} 
+                   onClick={() => setSearchQuery(tag)}
+                   className={`px-4 py-2 border rounded-xl text-[11px] font-bold cursor-pointer transition-colors ${searchQuery === tag ? 'bg-content text-background border-content' : 'bg-surface border-border hover:border-content/20'}`}
+                 >
+                   {tag}
+                 </div>
                ))}
-               <button className="p-2 hover:bg-surface rounded-xl border border-dashed border-border"><Plus size={14}/></button>
+               <button onClick={() => setIsCreatingCollection(true)} className="p-2 hover:bg-surface rounded-xl border border-dashed border-border"><Plus size={14}/></button>
             </div>
 
             {/* 4️⃣ Filter & Sort Bar */}
             <div className="mb-8 flex items-center justify-between py-4 border-b border-border/50">
                <div className="flex items-center gap-6">
                  <button className="flex items-center gap-2 text-[12px] font-bold hover:text-contentMuted transition-colors">
-                   <Filter size={14}/> 유형: 전체 미디어
+                   <Filter size={14}/> 유형: {activeTab === 'home' ? '전체' : activeTab === 'gallery' ? '이미지' : activeTab === 'bookmarks' ? '북마크' : activeCollection || '일반'}
                  </button>
                  <button className="flex items-center gap-2 text-[12px] font-bold hover:text-contentMuted transition-colors">
                    <ArrowUpDown size={14}/> 최신순
@@ -230,9 +266,9 @@ function Dashboard() {
             <div className="pb-24">
               {loading ? (
                  <div className="py-20 flex justify-center"><div className="w-6 h-6 border-2 border-content/10 border-t-content rounded-full animate-spin" /></div>
-              ) : assets.length > 0 ? (
+              ) : filteredAssets.length > 0 ? (
                 <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-6 [column-fill:_balance]">
-                  {assets.map((asset) => (
+                  {filteredAssets.map((asset) => (
                     <div key={asset.id} className="break-inside-avoid mb-6 bg-surface border border-border rounded-2xl overflow-hidden group hover:shadow-2xl hover:scale-[1.01] transition-all duration-500 cursor-zoom-in">
                        <div className="relative">
                          <img 
