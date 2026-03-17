@@ -620,19 +620,37 @@ function openBatchSaveUI() {
         return;
     }
 
-    // 2. 전체 화면 레이아웃 (좌측 그리드 / 우측 사이드바)
+    // 2. 전체 화면 레이아웃 (Shadow DOM 컨테이너 생성)
+    const host = document.createElement('div');
+    host.id = 'def-batch-host';
+    host.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:2147483647;';
+    
+    // 타겟 페이지 CSS 충돌을 완벽 방지하는 Shadow DOM 🌟
+    const shadow = host.attachShadow({ mode: 'open' });
+
+    // 내부 CSS 주입
+    const style = document.createElement('style');
+    style.textContent = `
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+    `;
+    shadow.appendChild(style);
+
     const overlay = document.createElement('div');
     overlay.id = 'def-batch-overlay';
-    overlay.style.cssText = `position:fixed; top:0; left:0; width:100vw; height:100vh; background:#f4f5f7; z-index:2147483647; display:flex; flex-direction:column; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;`;
+    overlay.style.cssText = `position:absolute; top:0; left:0; width:100%; height:100%; background:#f4f5f7; display:flex; flex-direction:column; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;`;
 
     // 상단 헤더
     const header = document.createElement('div');
     header.style.cssText = `height:60px; padding:0 24px; display:flex; justify-content:space-between; align-items:center; background:#fff; border-bottom:1px solid #e1e4e8; flex-shrink:0;`;
     header.innerHTML = `
-        <div style="font-size:16px; font-weight:700; color:#111;">일괄 저장 <span style="color:#888; font-weight:500; font-size:14px; margin-left:8px;">(0 / ${mediaList.length})</span></div>
+        <div style="font-size:16px; font-weight:700; color:#111; font-family:-apple-system, sans-serif;">일괄 저장 <span class="def-header-count" style="color:#888; font-weight:500; font-size:14px; margin-left:8px;">(0 / ${mediaList.length})</span></div>
         <div style="display:flex; align-items:center; gap:16px;">
-            <button id="def-batch-select-all" style="background:none; border:none; color:#0066ff; font-weight:600; cursor:pointer; font-size:14px;">전체 선택</button>
-            <button id="def-batch-close" style="background:none; border:none; font-size:20px; cursor:pointer; color:#888; padding:4px;">✕</button>
+            <button id="def-batch-select-all" style="background:none; border:none; color:#0066ff; font-weight:600; cursor:pointer; font-size:14px; font-family:-apple-system, sans-serif;">전체 선택</button>
+            <button id="def-batch-close" style="background:none; border:none; font-size:20px; cursor:pointer; color:#888; padding:4px; font-family:-apple-system, sans-serif;">✕</button>
         </div>
     `;
     overlay.appendChild(header);
@@ -650,34 +668,35 @@ function openBatchSaveUI() {
     sidebar.innerHTML = `
         <div style="padding:24px; flex:1;">
             <div style="margin-bottom:24px;">
-                <div style="font-size:13px; font-weight:700; color:#555; margin-bottom:12px;">형식 필터</div>
-                <label style="display:block; margin-bottom:8px; font-size:14px;"><input type="checkbox" checked class="def-filter" value="all" style="margin-right:8px;">전체 보기</label>
-                <label style="display:block; margin-bottom:8px; font-size:14px;"><input type="checkbox" class="def-filter" value="img" style="margin-right:8px;">이미지 (jpg, png 등)</label>
-                <label style="display:block; margin-bottom:8px; font-size:14px;"><input type="checkbox" class="def-filter" value="mp4" style="margin-right:8px;">동영상 (mp4)</label>
-                <label style="display:block; margin-bottom:8px; font-size:14px;"><input type="checkbox" class="def-filter" value="svg" style="margin-right:8px;">벡터 (svg)</label>
+                <div style="font-size:13px; font-weight:700; color:#555; margin-bottom:12px; font-family:-apple-system, sans-serif;">형식 필터</div>
+                <label style="display:block; margin-bottom:8px; font-size:14px; font-family:-apple-system, sans-serif; cursor:pointer;"><input type="checkbox" checked class="def-filter" value="all" style="margin-right:8px;">전체 보기</label>
+                <label style="display:block; margin-bottom:8px; font-size:14px; font-family:-apple-system, sans-serif; cursor:pointer;"><input type="checkbox" class="def-filter" value="img" style="margin-right:8px;">이미지 (jpg, png 등)</label>
+                <label style="display:block; margin-bottom:8px; font-size:14px; font-family:-apple-system, sans-serif; cursor:pointer;"><input type="checkbox" class="def-filter" value="mp4" style="margin-right:8px;">동영상 (mp4)</label>
+                <label style="display:block; margin-bottom:8px; font-size:14px; font-family:-apple-system, sans-serif; cursor:pointer;"><input type="checkbox" class="def-filter" value="svg" style="margin-right:8px;">벡터 (svg)</label>
             </div>
             
             <div style="margin-bottom:24px;">
-                <div style="font-size:13px; font-weight:700; color:#555; margin-bottom:12px;">폴더 지정</div>
-                <select id="def-batch-folder" style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; outline:none; font-size:14px; background:#f9f9f9;">
+                <div style="font-size:13px; font-weight:700; color:#555; margin-bottom:12px; font-family:-apple-system, sans-serif;">폴더 지정</div>
+                <select id="def-batch-folder" style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; outline:none; font-size:14px; font-family:-apple-system, sans-serif; background:#f9f9f9;">
                     <option value="">+ 폴더 선택 안함</option>
                 </select>
             </div>
 
             <div style="margin-bottom:24px;">
-                <div style="font-size:13px; font-weight:700; color:#555; margin-bottom:12px;">일괄 태그 추가</div>
-                <input type="text" id="def-batch-tags" placeholder="태그 입력 (쉼표로 구분)" style="width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid #ddd; outline:none; font-size:14px; background:#f9f9f9;">
+                <div style="font-size:13px; font-weight:700; color:#555; margin-bottom:12px; font-family:-apple-system, sans-serif;">일괄 태그 추가</div>
+                <input type="text" id="def-batch-tags" placeholder="태그 입력 (쉼표로 구분)" style="width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid #ddd; outline:none; font-size:14px; font-family:-apple-system, sans-serif; background:#f9f9f9;">
             </div>
         </div>
         
         <div style="padding:20px; border-top:1px solid #e1e4e8; background:#fff;">
-            <button id="def-batch-submit" style="width:100%; background:#0066ff; color:#fff; border:none; padding:14px; border-radius:8px; font-weight:bold; font-size:15px; cursor:pointer; opacity:0.5; pointer-events:none; transition:0.2s;">0개 다운로드</button>
+            <button id="def-batch-submit" style="width:100%; background:#0066ff; color:#fff; border:none; padding:14px; border-radius:8px; font-weight:bold; font-size:15px; cursor:pointer; opacity:0.5; pointer-events:none; transition:0.2s; font-family:-apple-system, sans-serif;">0개 다운로드</button>
         </div>
     `;
 
     mainWrap.appendChild(gridWrap);
     mainWrap.appendChild(sidebar);
     overlay.appendChild(mainWrap);
+    shadow.appendChild(overlay);
 
     let selectedUrls = new Set();
     const cards = [];
@@ -734,12 +753,12 @@ function openBatchSaveUI() {
         cards.push(cardBox);
     });
 
-    document.body.appendChild(overlay);
+    document.body.appendChild(host);
     document.body.style.overflow = 'hidden';
 
 // ✨ [수정됨] 클라우드플레어 D1(collections)에서 실제 폴더 목록 불러오기
     function loadUserFolders() {
-        const folderSelect = document.getElementById('def-batch-folder');
+        const folderSelect = shadow.getElementById('def-batch-folder');
         
         // 1. background.js에 저장된 Clerk 토큰 가져오기
         chrome.runtime.sendMessage({ action: "get-clerk-token" }, async (response) => {
@@ -782,8 +801,8 @@ function openBatchSaveUI() {
     loadUserFolders();
 
     // 4. 상태 업데이트 및 제어 함수들
-    const submitBtn = document.getElementById('def-batch-submit');
-    const headerTitle = header.querySelector('span');
+    const submitBtn = shadow.getElementById('def-batch-submit');
+    const headerTitle = overlay.querySelector('.def-header-count');
 
     function updateUIState() {
         const count = selectedUrls.size;
@@ -800,7 +819,7 @@ function openBatchSaveUI() {
     }
 
     // 전체 선택 기능
-    document.getElementById('def-batch-select-all').onclick = () => {
+    shadow.getElementById('def-batch-select-all').onclick = () => {
         const visibleCards = cards.filter(c => c.style.display !== 'none');
         const allSelected = visibleCards.every(c => selectedUrls.has(c.querySelector('img').src));
         
@@ -823,13 +842,13 @@ function openBatchSaveUI() {
     };
 
     // 필터링 기능
-    const filters = document.querySelectorAll('.def-filter');
+    const filters = shadow.querySelectorAll('.def-filter');
     filters.forEach(f => {
         f.addEventListener('change', (e) => {
             if(e.target.value === 'all') {
                 filters.forEach(cb => { if(cb !== e.target) cb.checked = false; });
             } else {
-                document.querySelector('.def-filter[value="all"]').checked = false;
+                shadow.querySelector('.def-filter[value="all"]').checked = false;
             }
             
             const checkedValues = Array.from(filters).filter(cb => cb.checked).map(cb => cb.value);
@@ -844,8 +863,8 @@ function openBatchSaveUI() {
         });
     });
 
-    document.getElementById('def-batch-close').onclick = () => {
-        overlay.remove(); document.body.style.overflow = 'auto';
+    shadow.getElementById('def-batch-close').onclick = () => {
+        host.remove(); document.body.style.overflow = 'auto';
     };
 
     // 5. 최종 저장 실행 엔진
@@ -855,8 +874,8 @@ function openBatchSaveUI() {
         submitBtn.style.pointerEvents = 'none';
 
         // 우측 사이드바에서 유저가 입력한 태그와 폴더 가져오기
-        const userFolder = document.getElementById('def-batch-folder').value;
-        const userInputTags = document.getElementById('def-batch-tags').value;
+        const userFolder = shadow.getElementById('def-batch-folder').value;
+        const userInputTags = shadow.getElementById('def-batch-tags').value;
         
         let successCount = 0;
         const pageUrl = window.location.href; 
@@ -873,7 +892,7 @@ function openBatchSaveUI() {
         }
 
         showDeferenceToast(`🎉 성공적으로 ${successCount}개의 미디어를 저장했습니다!`, true);
-        overlay.remove(); 
+        host.remove(); 
         document.body.style.overflow = 'auto';
     };
 }

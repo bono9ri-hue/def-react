@@ -116,15 +116,20 @@ function handleMessage(request, sender, sendResponse) {
     return true;
   }
 
-  // ✨ [수정됨] 이 부분이 함수 밖으로 빠져나가 있어서 에러가 났습니다! 함수 안으로 안전하게 모셔왔습니다.
-  // 콘텐츠 스크립트가 스크롤 캡처 중 "지금 화면 찰칵!"을 요청할 때
+  // ✨ 콘텐츠 스크립트가 스크롤 캡처 중 "지금 화면 찰칵!"을 요청할 때
   if (request.action === "capture-viewport") {
     chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
       sendResponse({ dataUrl: dataUrl });
     });
     return true; // 비동기 응답 필수
   }
-} // <--- [핵심] handleMessage 함수는 여기서 닫혀야 합니다!
+}
+
+// Service worker keep-alive logic
+const KEEP_ALIVE_INTERVAL = 20000;
+setInterval(() => {
+  chrome.storage.local.get('keepAlive');
+}, KEEP_ALIVE_INTERVAL);
 
 chrome.runtime.onMessage.addListener(handleMessage);
 chrome.runtime.onMessageExternal.addListener(handleMessage);
