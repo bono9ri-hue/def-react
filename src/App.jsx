@@ -251,7 +251,10 @@ function Dashboard() {
                       <div 
                         key={bm.id} 
                         draggable
-                        onDragStart={() => handleDragStart(idx)}
+                        onDragStart={(e) => {
+                          // 브라우저가 스냅샷을 찍는 동안은 원래 스타일 유지
+                          setTimeout(() => handleDragStart(idx), 0);
+                        }}
                         onDragOver={handleDragOver}
                         onDrop={() => handleDrop(idx)}
                         onClick={() => window.open(bm.url, '_blank')} 
@@ -259,18 +262,19 @@ function Dashboard() {
                         className={`group flex flex-col items-center gap-1.5 w-[60px] cursor-pointer transition-all ${draggedIdx === idx ? 'opacity-30 scale-95' : 'opacity-100'}`}
                       >
                         <div 
-                          className="w-10 h-10 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden"
+                          className="w-10 h-10 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden pointer-events-none"
                           style={{ backgroundColor: bm.icon_value === 'transparent' ? 'transparent' : (bm.icon_value || 'var(--bg-surface)') }}
                         >
                            <img 
                              src={`https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=128`}
-                             className="w-full h-full object-cover transition-all z-10"
+                             className="w-full h-full object-cover transition-all z-10 pointer-events-none"
+                             draggable={false}
                              style={{ transform: `scale(${bm.icon_scale || 1.0})` }}
                              alt={bm.name}
                            />
                            {bm.icon_value !== 'transparent' && <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />}
                         </div>
-                        <span className="text-[9px] font-bold text-contentMuted truncate w-full text-center group-hover:text-content transition-colors">{bm.name}</span>
+                        <span className="text-[9px] font-bold text-contentMuted truncate w-full text-center group-hover:text-content transition-colors pointer-events-none">{bm.name}</span>
                       </div>
                     ))}
                     <button 
