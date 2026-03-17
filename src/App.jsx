@@ -517,25 +517,25 @@ function Dashboard() {
                      </div>
 
                      {/* 🕹️ Directional Controls (Overlays) */}
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y - 2})} className="absolute -top-6 left-1/2 -translate-x-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y - 0.5})} className="absolute -top-6 left-1/2 -translate-x-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
                        <ChevronUp size={12}/>
                      </button>
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y + 2})} className="absolute -bottom-6 left-1/2 -translate-x-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y + 0.5})} className="absolute -bottom-6 left-1/2 -translate-x-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
                        <ChevronDown size={12}/>
                      </button>
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x - 2})} className="absolute -left-6 top-1/2 -translate-y-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x - 0.5})} className="absolute -left-6 top-1/2 -translate-y-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
                        <ChevronLeft size={12}/>
                      </button>
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x + 2})} className="absolute -right-6 top-1/2 -translate-y-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x + 0.5})} className="absolute -right-6 top-1/2 -translate-y-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
                        <ChevronRight size={12}/>
                      </button>
 
                      {/* 🔍 Zoom Controls (Corner) */}
                      <div className="absolute -bottom-2 -right-8 flex flex-col gap-1 z-20">
-                       <button type="button" onClick={() => setBmForm({...bmForm, scale: Math.min(2.5, bmForm.scale + 0.1)})} className="p-1 bg-content text-background rounded-md shadow-md hover:scale-110 transition-all">
+                       <button type="button" onClick={() => setBmForm({...bmForm, scale: Math.min(2.5, bmForm.scale + 0.05)})} className="p-1 bg-content text-background rounded-md shadow-md hover:scale-110 transition-all">
                          <Plus size={10}/>
                        </button>
-                       <button type="button" onClick={() => setBmForm({...bmForm, scale: Math.max(0.3, bmForm.scale - 0.1)})} className="p-1 bg-sidebar border border-border rounded-md shadow-md hover:scale-110 transition-all">
+                       <button type="button" onClick={() => setBmForm({...bmForm, scale: Math.max(0.3, bmForm.scale - 0.05)})} className="p-1 bg-sidebar border border-border rounded-md shadow-md hover:scale-110 transition-all">
                          <Minus size={10}/>
                        </button>
                      </div>
