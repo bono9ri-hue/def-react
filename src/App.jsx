@@ -198,18 +198,18 @@ function Dashboard() {
           <div className="px-12 max-w-[1400px] mx-auto animate-slide-up">
             
             {/* 1️⃣ Bookmark Area (Speed Dial - Circular Icons) */}
-            <div className="mb-12 flex justify-center">
+            <div className="mb-10 flex justify-center">
                <div className="w-full max-w-[600px]">
-                  <div className="flex flex-wrap gap-4 justify-center">
+                  <div className="flex flex-wrap gap-2 justify-center">
                     {bookmarks.slice(0, 8).map(bm => (
                       <div 
                         key={bm.id} 
                         onClick={() => window.open(bm.url, '_blank')} 
                         onContextMenu={(e) => { e.preventDefault(); openBookmarkModal(bm); }}
-                        className="group flex flex-col items-center gap-2 w-[72px] cursor-pointer"
+                        className="group flex flex-col items-center gap-1.5 w-[60px] cursor-pointer"
                       >
                         <div 
-                          className="w-14 h-14 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden"
+                          className="w-10 h-10 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden"
                           style={{ backgroundColor: bm.icon_value === 'transparent' ? 'transparent' : (bm.icon_value || 'var(--bg-surface)') }}
                         >
                            <img 
@@ -220,14 +220,14 @@ function Dashboard() {
                            />
                            {bm.icon_value !== 'transparent' && <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />}
                         </div>
-                        <span className="text-[10px] font-bold text-contentMuted truncate w-full text-center group-hover:text-content transition-colors">{bm.name}</span>
+                        <span className="text-[9px] font-bold text-contentMuted truncate w-full text-center group-hover:text-content transition-colors">{bm.name}</span>
                       </div>
                     ))}
                     <button 
                       onClick={() => openBookmarkModal()}
-                      className="w-14 h-14 rounded-full border border-dashed border-border flex items-center justify-center text-contentMuted hover:border-content/30 hover:bg-surface transition-all shrink-0"
+                      className="w-10 h-10 rounded-full border border-dashed border-border flex items-center justify-center text-contentMuted hover:border-content/30 hover:bg-surface transition-all shrink-0"
                     >
-                       <Plus size={20}/>
+                       <Plus size={16}/>
                     </button>
                   </div>
                </div>
