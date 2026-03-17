@@ -28,7 +28,7 @@ function Dashboard() {
   const { isLoaded, userId, getToken } = useAuth();
   const { showToast } = useToast();
   const { getActiveTab } = useExtensionAction();
-  const { getAssets, getBookmarks, getCollections, saveCollection } = useApi();
+  const { getAssets, getBookmarks, getCollections, saveCollection, saveBookmark, updateBookmark, deleteBookmark } = useApi();
   
   const [activeTab, setActiveTab] = useState('home'); 
   const [activeCollection, setActiveCollection] = useState(null);
@@ -39,6 +39,22 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
+  
+  // 🔖 Bookmark Edit Modal States
+  const [isBookmarkModalOpen, setIsBookmarkModalOpen] = useState(false);
+  const [editingBookmark, setEditingBookmark] = useState(null);
+  const [bmForm, setBmForm] = useState({ name: '', url: '', color: '#ffffff', scale: 1.0 });
+
+  const openBookmarkModal = (bm = null) => {
+    if (bm) {
+      setEditingBookmark(bm);
+      setBmForm({ name: bm.name, url: bm.url, color: bm.icon_value === 'transparent' ? '#ffffff' : (bm.icon_value || '#ffffff'), scale: bm.icon_scale || 1.0, isTransparent: bm.icon_value === 'transparent' });
+    } else {
+      setEditingBookmark(null);
+      setBmForm({ name: '', url: '', color: '#ffffff', scale: 1.0, isTransparent: true });
+    }
+    setIsBookmarkModalOpen(true);
+  };
 
   // 🔍 Filtered Data Logic
   const filteredAssets = assets.filter(asset => {
@@ -192,23 +208,36 @@ function Dashboard() {
                  </h3>
                  <button className="text-[11px] font-bold text-contentMuted hover:text-content">전체보기</button>
                </div>
-               <div className="flex flex-wrap gap-5">
-                 {bookmarks.slice(0, 8).map(bm => (
-                   <div key={bm.id} onClick={() => window.open(bm.url, '_blank')} className="group flex flex-col items-center gap-2 w-[72px] cursor-pointer">
-                     <div className="w-14 h-14 rounded-full bg-surface border border-border shadow-sm flex items-center justify-center group-hover:bg-content group-hover:text-background transition-all duration-300">
-                        <img 
-                          src={`https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=64`}
-                          className="w-7 h-7 rounded-[4px] group-hover:invert transition-all"
-                          alt={bm.name}
-                        />
-                     </div>
-                     <span className="text-[10px] font-bold text-contentMuted truncate w-full text-center group-hover:text-content transition-colors">{bm.name}</span>
-                   </div>
-                 ))}
-                 <button className="w-14 h-14 rounded-full border border-dashed border-border flex items-center justify-center text-contentMuted hover:border-content/30 hover:bg-surface transition-all">
-                    <Plus size={20}/>
-                 </button>
-               </div>
+                <div className="flex flex-wrap gap-5">
+                  {bookmarks.slice(0, 8).map(bm => (
+                    <div 
+                      key={bm.id} 
+                      onClick={() => window.open(bm.url, '_blank')} 
+                      onContextMenu={(e) => { e.preventDefault(); openBookmarkModal(bm); }}
+                      className="group flex flex-col items-center gap-2 w-[72px] cursor-pointer"
+                    >
+                      <div 
+                        className="w-14 h-14 rounded-full border border-border shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden"
+                        style={{ backgroundColor: bm.icon_value === 'transparent' ? 'transparent' : (bm.icon_value || 'var(--bg-surface)') }}
+                      >
+                         <img 
+                           src={`https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=64`}
+                           className="w-7 h-7 rounded-[4px] transition-all z-10"
+                           style={{ transform: `scale(${bm.icon_scale || 1.0})` }}
+                           alt={bm.name}
+                         />
+                         {bm.icon_value !== 'transparent' && <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />}
+                      </div>
+                      <span className="text-[10px] font-bold text-contentMuted truncate w-full text-center group-hover:text-content transition-colors">{bm.name}</span>
+                    </div>
+                  ))}
+                  <button 
+                    onClick={() => openBookmarkModal()}
+                    className="w-14 h-14 rounded-full border border-dashed border-border flex items-center justify-center text-contentMuted hover:border-content/30 hover:bg-surface transition-all"
+                  >
+                     <Plus size={20}/>
+                  </button>
+                </div>
             </div>
 
             {/* 2️⃣ Search Area */}
@@ -336,6 +365,88 @@ function Dashboard() {
                 <div className="flex gap-2 mt-4">
                   <Button type="button" variant="outline" onClick={() => setIsCreatingCollection(false)} className="flex-1 rounded-2xl border-none hover:bg-sidebar text-[13px] font-bold">취소</Button>
                   <Button type="submit" variant="primary" className="flex-1 rounded-2xl shadow-lg text-[13px] font-bold">생성하기</Button>
+                </div>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL: Bookmark Editor */}
+      {isBookmarkModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
+           <div className="bg-background border border-border w-full max-w-sm rounded-[32px] p-8 shadow-2xl animate-slide-up">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-[20px] font-black tracking-tight mb-1">{editingBookmark ? '북마크 수정' : '북마크 추가'}</h2>
+                  <p className="text-[12px] text-contentMuted font-semibold">스피드 다이얼 설정을 구성합니다.</p>
+                </div>
+                {editingBookmark && (
+                  <button 
+                    onClick={async () => {
+                      if (window.confirm("정말 삭제하시겠습니까?")) {
+                        await deleteBookmark(editingBookmark.id);
+                        showToast("삭제되었습니다.", "success");
+                        setIsBookmarkModalOpen(false);
+                        fetchData();
+                      }
+                    }}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                  >
+                     <LogOut size={16} className="rotate-180"/>
+                  </button>
+                )}
+              </div>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const data = {
+                  name: bmForm.name,
+                  url: bmForm.url.startsWith('http') ? bmForm.url : `https://${bmForm.url}`,
+                  icon_value: bmForm.isTransparent ? 'transparent' : bmForm.color,
+                  icon_scale: bmForm.scale
+                };
+                try {
+                  if (editingBookmark) {
+                    await updateBookmark(editingBookmark.id, data);
+                  } else {
+                    await saveBookmark(data);
+                  }
+                  showToast("저장 완료!", "success");
+                  setIsBookmarkModalOpen(false);
+                  fetchData();
+                } catch(err) { showToast("실패했습니다.", "error"); }
+              }} className="flex flex-col gap-5">
+                
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-black text-contentMuted uppercase px-1">기본 정보</span>
+                  <input value={bmForm.name} onChange={e=>setBmForm({...bmForm, name: e.target.value})} type="text" placeholder="이름 (예: Pinterest)" className="w-full h-11 px-4 bg-sidebar border border-border rounded-xl focus:outline-none focus:border-content transition-all text-[13px] font-bold" required />
+                  <input value={bmForm.url} onChange={e=>setBmForm({...bmForm, url: e.target.value})} type="text" placeholder="주소 (예: pinterest.com)" className="w-full h-11 px-4 bg-sidebar border border-border rounded-xl focus:outline-none focus:border-content transition-all text-[13px] font-bold" required />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-black text-contentMuted uppercase">아이콘 크기</span>
+                    <span className="text-[11px] font-black">{bmForm.scale.toFixed(1)}x</span>
+                  </div>
+                  <input type="range" min="0.5" max="2.0" step="0.1" value={bmForm.scale} onChange={e=>setBmForm({...bmForm, scale: parseFloat(e.target.value)})} className="w-full h-1.5 bg-border rounded-lg appearance-none cursor-pointer accent-content" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-black text-contentMuted uppercase">배경 설정</span>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                       <input type="checkbox" checked={bmForm.isTransparent} onChange={e=>setBmForm({...bmForm, isTransparent: e.target.checked})} className="w-4 h-4 accent-content" />
+                       <span className="text-[11px] font-bold">투명</span>
+                    </label>
+                  </div>
+                  {!bmForm.isTransparent && (
+                    <input type="color" value={bmForm.color} onChange={e=>setBmForm({...bmForm, color: e.target.value})} className="w-full h-10 p-1 bg-sidebar border border-border rounded-xl cursor-pointer" />
+                  )}
+                </div>
+
+                <div className="flex gap-2 mt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsBookmarkModalOpen(false)} className="flex-1 rounded-2xl border-none hover:bg-sidebar text-[13px] font-bold">취소</Button>
+                  <Button type="submit" variant="primary" className="flex-1 rounded-2xl shadow-lg text-[13px] font-bold">저장하기</Button>
                 </div>
               </form>
            </div>

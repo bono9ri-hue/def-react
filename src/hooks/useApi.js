@@ -94,12 +94,27 @@ export function useApi() {
     });
   }, [fetchWithAuth]);
 
+  const updateBookmark = useCallback(async (id, data) => {
+    return fetchWithAuth(`/bookmarks/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data)
+    });
+  }, [fetchWithAuth]);
+
+  const deleteBookmark = useCallback(async (id) => {
+    return fetchWithAuth(`/bookmarks/${id}`, {
+      method: "DELETE"
+    });
+  }, [fetchWithAuth]);
+
   return {
     fetchWithAuth,
     saveAsset,
     getAssets,
     saveBookmark,
     getBookmarks,
+    updateBookmark,
+    deleteBookmark,
     getCollections,
     saveCollection,
     uploadFile
