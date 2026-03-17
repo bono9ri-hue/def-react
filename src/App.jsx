@@ -425,6 +425,29 @@ function Dashboard() {
                 }
               }} className="flex flex-col gap-5">
                 
+                {/* 🌟 Real-time Preview Area */}
+                <div className="flex flex-col items-center justify-center p-6 bg-sidebar rounded-2xl border border-dashed border-border mb-2">
+                   <span className="text-[9px] font-black text-contentMuted uppercase mb-4 tracking-widest">실시간 미리보기</span>
+                   <div 
+                      className="w-16 h-16 rounded-full shadow-lg flex items-center justify-center relative overflow-hidden transition-all duration-200"
+                      style={{ backgroundColor: bmForm.isTransparent ? 'transparent' : bmForm.color, border: bmForm.isTransparent ? '1px dashed var(--border-color)' : 'none' }}
+                   >
+                     {bmForm.url ? (
+                       <img 
+                         src={`https://www.google.com/s2/favicons?domain=${bmForm.url.includes('.') ? (bmForm.url.startsWith('http') ? new URL(bmForm.url).hostname : bmForm.url) : 'google.com'}&sz=128`}
+                         className="w-full h-full object-cover z-10"
+                         style={{ transform: `scale(${bmForm.scale})` }}
+                         alt="Preview"
+                         onError={(e) => { e.target.src = 'https://www.google.com/s2/favicons?domain=google.com&sz=128'; }}
+                       />
+                     ) : (
+                       <Plus size={24} className="text-contentMuted opacity-20"/>
+                     )}
+                     {!bmForm.isTransparent && <div className="absolute inset-0 bg-black/5" />}
+                   </div>
+                   <span className="text-[10px] font-bold text-contentMuted mt-3">{bmForm.name || "북마크 이름"}</span>
+                </div>
+
                 <div className="space-y-1.5">
                   <span className="text-[10px] font-black text-contentMuted uppercase px-1">기본 정보</span>
                   <input value={bmForm.name} onChange={e=>setBmForm({...bmForm, name: e.target.value})} type="text" placeholder="이름 (예: Pinterest)" className="w-full h-11 px-4 bg-sidebar border border-border rounded-xl focus:outline-none focus:border-content transition-all text-[13px] font-bold" required />
