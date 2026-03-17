@@ -471,7 +471,7 @@ function showPreSaveModal(imgUrl, vidUrl, sourceLink) {
         modalBox.innerHTML = `
             <div style="display:flex; flex-direction:column; items-center; justify-content:center; padding:40px; text-align:center;">
                 <div style="width:24px; h-24px; border:3px solid #eee; border-top-color:#000; border-radius:50%; animate: spin 1s linear infinite; margin: 0 auto 16px;"></div>
-                <div style="font-size:13px; font-weight:800; letter-spacing:1px;">ARCHIVING...</div>
+                <div style="font-size:13px; font-weight:800; letter-spacing:1px;">아카이빙 중...</div>
             </div>
             <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
         `;
@@ -489,12 +489,12 @@ function showPreSaveModal(imgUrl, vidUrl, sourceLink) {
                 const newTagIn = document.getElementById('def-tag-in');
                 newSaveBtn.onclick = saveBtn.onclick;
                 newTagIn.onkeydown = tagIn.onkeydown;
-                showDeferenceToast("🔒 LOGIN REQUIRED", false);
+                showDeferenceToast("🔒 로그인이 필요합니다", false);
             }
         } catch (err) {
             console.error("Archive error:", err);
             modalBox.innerHTML = originalContent;
-            showDeferenceToast("❌ ARCHIVE FAILED", false);
+            showDeferenceToast("❌ 저장 실패", false);
         }
     };
 }
@@ -561,7 +561,7 @@ async function executeUpload(imgUrl, vidUrl, pageUrl, tags, memo, folder) {
 
         if (!dbRes.ok) throw new Error("D1 save failed");
 
-        showDeferenceToast("💎 ARCHIVED!", true);
+        showDeferenceToast("💎 저장 완료!", true);
         return true;
 
     } catch (e) { 

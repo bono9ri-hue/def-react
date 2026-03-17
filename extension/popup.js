@@ -87,14 +87,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const token = await getToken();
         
         if (!token) {
-            alert("No session found! Please open https://deference.work and log in first.");
+            alert("로그인 정보가 없습니다! https://deference.work 페이지를 열어 로그인 후 다시 시도해주세요.");
             window.open("https://deference.work");
             return;
         }
 
         const btn = document.getElementById('btn-save-bookmark');
         const originalHtml = btn.innerHTML;
-        btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saving...</span>`;
+        btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">저장 중...</span>`;
 
         try {
             const res = await fetch(`${WORKER_URL}/bookmarks`, {
@@ -109,14 +109,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
             if (res.ok) {
-                btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saved! 📌</span>`;
+                btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">저장 완료! 📌</span>`;
                 setTimeout(() => window.close(), 1000);
             } else {
                 throw new Error("API failed");
             }
         } catch (e) {
             btn.innerHTML = originalHtml;
-            alert("Failed to save bookmark.");
+            alert("북마크 저장에 실패했습니다.");
         }
     });
 
@@ -126,14 +126,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const token = await getToken();
         
         if (!token) {
-            alert("No session found! Please open https://deference.work and log in first.");
+            alert("로그인 정보가 없습니다! https://deference.work 페이지를 열어 로그인 후 다시 시도해주세요.");
             window.open("https://deference.work");
             return;
         }
 
         const btn = document.getElementById('btn-save-link');
         const originalHtml = btn.innerHTML;
-        btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saving...</span>`;
+        btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">저장 중...</span>`;
 
         try {
             const res = await fetch(`${WORKER_URL}/assets`, {
@@ -149,14 +149,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
             if (res.ok) {
-                btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">Saved! 🔗</span>`;
+                btn.innerHTML = `<span style="font-size:12px; font-weight:bold; color:var(--text-main);">저장 완료! 🔗</span>`;
                 setTimeout(() => window.close(), 1000);
             } else {
                 throw new Error("API failed");
             }
         } catch (e) {
             btn.innerHTML = originalHtml;
-            alert("Failed to save link.");
+            alert("링크 저장에 실패했습니다.");
         }
     });
 });

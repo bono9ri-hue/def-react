@@ -1,70 +1,74 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Deference Capture</title>
     <link rel="stylesheet" href="style.css">
-    <!-- SVG Icons from local Lucide copy (for CSP compliance) -->
     <script src="lucide.min.js"></script>
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
+        <!-- 상단 헤더 -->
         <header class="header">
             <div class="logo-area">
                 <div class="logo-box">DEF</div>
                 <span class="logo-text">Deference</span>
             </div>
-            <button id="theme-toggle" class="icon-btn" title="Toggle Theme">
+            <button id="theme-toggle" class="icon-btn" title="테마 변경">
                 <i data-lucide="moon" class="theme-icon dark-only"></i>
                 <i data-lucide="sun" class="theme-icon light-only"></i>
             </button>
         </header>
 
-        <!-- Main Actions -->
+        <!-- 핵심 액션: 영역/화면 캡처 -->
         <main class="actions-grid">
             <button id="btn-capture-area" class="action-btn">
                 <div class="icon-wrapper"><i data-lucide="crop"></i></div>
-                <div class="btn-text">Capture Area</div>
+                <div class="btn-text">영역 캡처</div>
             </button>
             
             <button id="btn-capture-visible" class="action-btn">
                 <div class="icon-wrapper"><i data-lucide="monitor"></i></div>
-                <div class="btn-text">Visible Screen</div>
+                <div class="btn-text">전체 화면</div>
             </button>
         </main>
 
-        <!-- List Actions -->
+        <!-- 추가 기능 리스트 -->
         <div class="actions-list">
+            <div class="list-section-title">스마트 아카이빙</div>
+            
             <button id="btn-batch-archive" class="list-btn">
                 <i data-lucide="layers" class="list-icon"></i>
                 <div class="list-text">
-                    <span class="title">Batch Archive</span>
-                    <span class="subtitle">Save multiple media</span>
+                    <span class="title">일괄 이미지 수집</span>
+                    <span class="subtitle">현재 페이지의 모든 이미지 추출</span>
                 </div>
             </button>
 
             <button id="btn-save-bookmark" class="list-btn">
                 <i data-lucide="bookmark" class="list-icon"></i>
                 <div class="list-text">
-                    <span class="title">Save Bookmark</span>
-                    <span class="subtitle">Pin to speed dial</span>
+                    <span class="title">북마크 추가</span>
+                    <span class="subtitle">스피드 다이얼에 사이트 고정</span>
                 </div>
             </button>
             
             <button id="btn-save-link" class="list-btn">
                 <i data-lucide="link" class="list-icon"></i>
                 <div class="list-text">
-                    <span class="title">Save Link</span>
-                    <span class="subtitle">Archive current page</span>
+                    <span class="title">링크 저장</span>
+                    <span class="subtitle">현재 페이지 주소만 따로 보관</span>
                 </div>
             </button>
         </div>
 
-        <!-- Footer -->
+        <!-- 하단 푸터 (대시보드 이동) -->
         <footer class="footer">
-            <a href="https://deference.work" target="_blank" class="footer-link">Open Gallery ↗</a>
+            <a href="https://deference.work" target="_blank" class="footer-link">
+                <span>데이터 대시보드 열기</span>
+                <i data-lucide="external-link" size="12"></i>
+            </a>
         </footer>
     </div>
     <script src="popup.js"></script>
