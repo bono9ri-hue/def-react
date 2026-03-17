@@ -95,14 +95,14 @@ export function useApi() {
   }, [fetchWithAuth]);
 
   const updateBookmark = useCallback(async (id, data) => {
-    return fetchWithAuth(`/bookmarks/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data)
+    return fetchWithAuth('/bookmarks', {
+      method: "PUT",
+      body: JSON.stringify({ ...data, id })
     });
   }, [fetchWithAuth]);
 
   const deleteBookmark = useCallback(async (id) => {
-    return fetchWithAuth(`/bookmarks/${id}`, {
+    return fetchWithAuth(`/bookmarks?id=${id}`, {
       method: "DELETE"
     });
   }, [fetchWithAuth]);

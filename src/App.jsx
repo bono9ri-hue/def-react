@@ -384,10 +384,14 @@ function Dashboard() {
                   <button 
                     onClick={async () => {
                       if (window.confirm("정말 삭제하시겠습니까?")) {
-                        await deleteBookmark(editingBookmark.id);
-                        showToast("삭제되었습니다.", "success");
-                        setIsBookmarkModalOpen(false);
-                        fetchData();
+                        try {
+                          await deleteBookmark(editingBookmark.id);
+                          showToast("삭제되었습니다.", "success");
+                          setIsBookmarkModalOpen(false);
+                          fetchData();
+                        } catch (err) {
+                          showToast("삭제에 실패했습니다.", "error");
+                        }
                       }
                     }}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
@@ -403,7 +407,8 @@ function Dashboard() {
                   name: bmForm.name,
                   url: bmForm.url.startsWith('http') ? bmForm.url : `https://${bmForm.url}`,
                   icon_value: bmForm.isTransparent ? 'transparent' : bmForm.color,
-                  icon_scale: bmForm.scale
+                  icon_scale: bmForm.scale,
+                  icon_type: 'color' // 🌟 필수 필드 추가
                 };
                 try {
                   if (editingBookmark) {
@@ -414,7 +419,10 @@ function Dashboard() {
                   showToast("저장 완료!", "success");
                   setIsBookmarkModalOpen(false);
                   fetchData();
-                } catch(err) { showToast("실패했습니다.", "error"); }
+                } catch(err) { 
+                  console.error("Bookmark Save Error:", err);
+                  showToast("저장에 실패했습니다.", "error"); 
+                }
               }} className="flex flex-col gap-5">
                 
                 <div className="space-y-1.5">
