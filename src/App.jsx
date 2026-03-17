@@ -516,51 +516,42 @@ function Dashboard() {
                        {!bmForm.isTransparent && <div className="absolute inset-0 bg-black/5" />}
                      </div>
 
-                     {/* 🕹️ Directional Controls (Overlays) */}
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y - 0.5})} className="absolute -top-6 left-1/2 -translate-x-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
-                       <ChevronUp size={12}/>
+                     {/* 🕹️ Directional Controls (Pushed to box borders) */}
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y - 0.5})} className="absolute top-2 left-1/2 -translate-x-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                       <ChevronUp size={14}/>
                      </button>
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y + 0.5})} className="absolute -bottom-6 left-1/2 -translate-x-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
-                       <ChevronDown size={12}/>
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_y: bmForm.offset_y + 0.5})} className="absolute bottom-12 left-1/2 -translate-x-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                       <ChevronDown size={14}/>
                      </button>
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x - 0.5})} className="absolute -left-6 top-1/2 -translate-y-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
-                       <ChevronLeft size={12}/>
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x - 0.5})} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                       <ChevronLeft size={14}/>
                      </button>
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x + 0.5})} className="absolute -right-6 top-1/2 -translate-y-1/2 p-1 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
-                       <ChevronRight size={12}/>
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: bmForm.offset_x + 0.5})} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-background border border-border rounded-full shadow-sm hover:bg-surface transition-all z-20">
+                       <ChevronRight size={14}/>
                      </button>
 
-                     {/* 🔍 Zoom Controls (Corner) */}
-                     <div className="absolute -bottom-2 -right-8 flex flex-col gap-1 z-20">
-                       <button type="button" onClick={() => setBmForm({...bmForm, scale: Math.min(2.5, bmForm.scale + 0.05)})} className="p-1 bg-content text-background rounded-md shadow-md hover:scale-110 transition-all">
-                         <Plus size={10}/>
-                       </button>
-                       <button type="button" onClick={() => setBmForm({...bmForm, scale: Math.max(0.3, bmForm.scale - 0.05)})} className="p-1 bg-sidebar border border-border rounded-md shadow-md hover:scale-110 transition-all">
-                         <Minus size={10}/>
-                       </button>
-                     </div>
-                     
-                     {/* 🔄 Reset Button */}
-                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: 0, offset_y: 0, scale: 1.0})} className="absolute -top-2 -right-8 p-1 bg-sidebar border border-border rounded-md shadow-sm hover:text-red-500 transition-all z-20" title="초기화">
-                       <RefreshCw size={10}/>
+                     {/* 🔄 Reset Button (Extreme Top Right) */}
+                     <button type="button" onClick={() => setBmForm({...bmForm, offset_x: 0, offset_y: 0, scale: 1.0})} className="absolute top-2 right-2 p-1.5 bg-background border border-border rounded-md shadow-sm hover:text-red-500 transition-all z-20" title="초기화">
+                       <RefreshCw size={12}/>
                      </button>
+
+                     {/* 🔍 Integrated Scale Slider (Inside the box) */}
+                     <div className="absolute bottom-3 left-6 right-6 space-y-1">
+                        <div className="flex justify-between items-center px-1">
+                          <span className="text-[9px] font-black text-contentMuted uppercase">Scale</span>
+                          <span className="text-[9px] font-black">{bmForm.scale.toFixed(2)}x</span>
+                        </div>
+                        <input type="range" min="0.3" max="2.5" step="0.01" value={bmForm.scale} onChange={e=>setBmForm({...bmForm, scale: parseFloat(e.target.value)})} className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-content" />
+                     </div>
                    </div>
                    
-                   <span className="text-[10px] font-bold text-contentMuted mt-10">{bmForm.name || "북마크 이름"}</span>
+                   <span className="text-[10px] font-bold text-contentMuted mt-4">{bmForm.name || "북마크 이름"}</span>
                 </div>
 
                 <div className="space-y-1.5">
                   <span className="text-[10px] font-black text-contentMuted uppercase px-1">기본 정보</span>
                   <input value={bmForm.name} onChange={e=>setBmForm({...bmForm, name: e.target.value})} type="text" placeholder="이름 (예: Pinterest)" className="w-full h-11 px-4 bg-sidebar border border-border rounded-xl focus:outline-none focus:border-content transition-all text-[13px] font-bold" required />
                   <input value={bmForm.url} onChange={e=>setBmForm({...bmForm, url: e.target.value})} type="text" placeholder="주소 (예: pinterest.com)" className="w-full h-11 px-4 bg-sidebar border border-border rounded-xl focus:outline-none focus:border-content transition-all text-[13px] font-bold" required />
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-black text-contentMuted uppercase">아이콘 크기</span>
-                    <span className="text-[11px] font-black">{bmForm.scale.toFixed(1)}x</span>
-                  </div>
-                  <input type="range" min="0.5" max="2.0" step="0.1" value={bmForm.scale} onChange={e=>setBmForm({...bmForm, scale: parseFloat(e.target.value)})} className="w-full h-1.5 bg-border rounded-lg appearance-none cursor-pointer accent-content" />
                 </div>
 
                 <div className="space-y-1.5">
