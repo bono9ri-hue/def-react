@@ -1,0 +1,66 @@
+/* [content.css] */
+
+#def-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2147483646; cursor: crosshair; user-select: none; -webkit-user-select: none; background: rgba(0, 0, 0, 0.7); }
+#def-overlay.has-selection { background: transparent; }
+#def-selection { position: absolute; border: 1px dashed rgba(255, 255, 255, 0.4); box-sizing: border-box; cursor: move; display: none; user-select: none; -webkit-user-select: none; box-shadow: 0 0 0 99999px rgba(0, 0, 0, 0.7); }
+#def-size-label { position: absolute; top: -24px; left: -1px; background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-family: sans-serif; pointer-events: none; white-space: nowrap; user-select: none; }
+.def-handle { position: absolute; width: 8px; height: 8px; background: #fff; border: 1px solid rgba(0, 0, 0, 0.5); border-radius: 50%; box-sizing: border-box; transform: translate(-50%, -50%); user-select: none; z-index: 2; }
+
+#def-bottom-toolbar {
+    position: absolute;
+    bottom: -48px; 
+    left: 50%;
+    transform: translateX(-50%); 
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 6px;
+    border-radius: 8px;
+    z-index: 2147483647;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    white-space: nowrap; 
+}
+
+#def-ratio-group { display: flex; gap: 4px; align-items: center; }
+
+.def-ratio-btn {
+    background: transparent; color: rgba(255, 255, 255, 0.4); border: none; padding: 6px 10px; font-size: 11px; font-weight: 800; cursor: pointer; border-radius: 4px; transition: all 0.2s;
+}
+.def-ratio-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+.def-ratio-btn.active { background: rgba(255,255,255,0.2); color: #fff; }
+
+.def-divider { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.2); margin: 0 2px; }
+
+#def-action-btn { background: #fff; color: #000; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-weight: 900; font-size: 11px; outline: none; user-select: none; transition: background 0.2s; }
+#def-action-btn:hover { background: #e0e0e0; }
+
+/* 🌟 [추가됨] 커스텀 사이즈 입력창 디자인 */
+.def-custom-input {
+    width: 38px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-radius: 4px;
+    padding: 4px;
+    font-size: 11px;
+    text-align: center;
+    outline: none;
+    font-family: monospace;
+    transition: 0.2s;
+}
+.def-custom-input:focus { border-color: #fff; background: rgba(255, 255, 255, 0.2); }
+.def-custom-input::placeholder { color: rgba(255, 255, 255, 0.3); }
+
+/* 크롬 등 브라우저 기본 화살표(스피너) 숨기기 */
+.def-custom-input::-webkit-outer-spin-button,
+.def-custom-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+
+
