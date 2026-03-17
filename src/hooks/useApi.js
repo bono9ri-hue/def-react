@@ -101,6 +101,13 @@ export function useApi() {
     });
   }, [fetchWithAuth]);
 
+  const updateBookmarkOrder = useCallback(async (bookmarksArray) => {
+    return fetchWithAuth('/bookmarks', {
+      method: "PUT",
+      body: JSON.stringify(bookmarksArray)
+    });
+  }, [fetchWithAuth]);
+
   const deleteBookmark = useCallback(async (id) => {
     return fetchWithAuth(`/bookmarks?id=${id}`, {
       method: "DELETE"
@@ -114,6 +121,7 @@ export function useApi() {
     saveBookmark,
     getBookmarks,
     updateBookmark,
+    updateBookmarkOrder, // 🌟 추가
     deleteBookmark,
     getCollections,
     saveCollection,

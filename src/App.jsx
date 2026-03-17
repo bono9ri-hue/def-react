@@ -28,7 +28,16 @@ function Dashboard() {
   const { isLoaded, userId, getToken } = useAuth();
   const { showToast } = useToast();
   const { getActiveTab } = useExtensionAction();
-  const { getAssets, getBookmarks, getCollections, saveCollection, saveBookmark, updateBookmark, deleteBookmark } = useApi();
+  const { 
+    getAssets, 
+    getBookmarks, 
+    getCollections, 
+    saveCollection, 
+    saveBookmark, 
+    updateBookmark, 
+    updateBookmarkOrder, // 🌟 추가
+    deleteBookmark 
+  } = useApi();
   
   const [activeTab, setActiveTab] = useState('home'); 
   const [activeCollection, setActiveCollection] = useState(null);
@@ -44,6 +53,9 @@ function Dashboard() {
   const [isBookmarkModalOpen, setIsBookmarkModalOpen] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState(null);
   const [bmForm, setBmForm] = useState({ name: '', url: '', color: '#ffffff', scale: 1.0 });
+
+  // 🔃 Drag and Drop State
+  const [draggedIdx, setDraggedIdx] = useState(null);
 
   const openBookmarkModal = (bm = null) => {
     if (bm) {
@@ -104,6 +116,40 @@ function Dashboard() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // 🔃 Drag and Drop Handlers
+  const handleDragStart = (idx) => {
+    setDraggedIdx(idx);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (targetIdx) => {
+    if (draggedIdx === null || draggedIdx === targetIdx) return;
+
+    const newBookmarks = [...bookmarks];
+    const [draggedItem] = newBookmarks.splice(draggedIdx, 1);
+    newBookmarks.splice(targetIdx, 0, draggedItem);
+
+    // Update sort_order for all
+    const updatedBms = newBookmarks.map((bm, index) => ({
+      ...bm,
+      sort_order: index
+    }));
+
+    setBookmarks(updatedBms); // Optimistic UI update
+    setDraggedIdx(null);
+
+    try {
+      await updateBookmarkOrder(updatedBms);
+    } catch (err) {
+      console.error("Order update failed:", err);
+      showToast("순서 저장에 실패했습니다.", "error");
+      fetchData(); // Rollback on error
+    }
+  };
 
   if (!isLoaded) {
     return (
@@ -200,13 +246,17 @@ function Dashboard() {
             {/* 1️⃣ Bookmark Area (Speed Dial - Circular Icons) */}
             <div className="mb-10 flex justify-center">
                <div className="w-full max-w-[600px]">
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {bookmarks.slice(0, 8).map(bm => (
+                  <div className="flex flex-wrap gap-4 justify-center">
+                    {bookmarks.slice(0, 8).map((bm, idx) => (
                       <div 
                         key={bm.id} 
+                        draggable
+                        onDragStart={() => handleDragStart(idx)}
+                        onDragOver={handleDragOver}
+                        onDrop={() => handleDrop(idx)}
                         onClick={() => window.open(bm.url, '_blank')} 
                         onContextMenu={(e) => { e.preventDefault(); openBookmarkModal(bm); }}
-                        className="group flex flex-col items-center gap-1.5 w-[60px] cursor-pointer"
+                        className={`group flex flex-col items-center gap-1.5 w-[60px] cursor-pointer transition-all ${draggedIdx === idx ? 'opacity-30 scale-95' : 'opacity-100'}`}
                       >
                         <div 
                           className="w-10 h-10 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden"
