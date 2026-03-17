@@ -467,9 +467,35 @@ function showPreSaveModal(imgUrl, vidUrl, sourceLink) {
     
     saveBtn.onclick = async () => {
         const tags = tagIn.value, memo = document.getElementById('def-memo-in').value;
-        modalBox.innerHTML = '<div style="text-align:center; padding:40px; font-size:13px; font-weight:600;">💎 Archiving...</div>';
-        await executeUpload(imgUrl, vidUrl, sourceLink, tags, memo);
-        modalWrap.remove(); isModalOpen = false;
+        const originalContent = modalBox.innerHTML;
+        modalBox.innerHTML = `
+            <div style="display:flex; flex-direction:column; items-center; justify-content:center; padding:40px; text-align:center;">
+                <div style="width:24px; h-24px; border:3px solid #eee; border-top-color:#000; border-radius:50%; animate: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+                <div style="font-size:13px; font-weight:800; letter-spacing:1px;">ARCHIVING...</div>
+            </div>
+            <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+        `;
+        
+        try {
+            const success = await executeUpload(imgUrl, vidUrl, sourceLink, tags, memo);
+            if (success) {
+                modalWrap.remove(); 
+                isModalOpen = false;
+            } else {
+                modalBox.innerHTML = originalContent;
+                // Re-bind events since we overwrote innerHTML
+                document.getElementById('def-cancel').onclick = () => { modalWrap.remove(); isModalOpen = false; };
+                const newSaveBtn = document.getElementById('def-save');
+                const newTagIn = document.getElementById('def-tag-in');
+                newSaveBtn.onclick = saveBtn.onclick;
+                newTagIn.onkeydown = tagIn.onkeydown;
+                showDeferenceToast("🔒 LOGIN REQUIRED", false);
+            }
+        } catch (err) {
+            console.error("Archive error:", err);
+            modalBox.innerHTML = originalContent;
+            showDeferenceToast("❌ ARCHIVE FAILED", false);
+        }
     };
 }
 
@@ -480,9 +506,8 @@ async function executeUpload(imgUrl, vidUrl, pageUrl, tags, memo, folder) {
     try {
         const token = await new Promise((resolve) => {
             chrome.runtime.sendMessage({ action: "get-clerk-token" }, (response) => {
-                // ✨ [수정] 백그라운드와 연결이 끊겼거나 응답이 없을 때 에러가 나지 않도록 방어막 추가!
                 if (chrome.runtime.lastError || !response) {
-                    console.warn("백그라운드 통신 오류 또는 토큰 없음:", chrome.runtime.lastError);
+                    console.warn("Backgorund talk error or no token:", chrome.runtime.lastError);
                     resolve(null);
                 } else {
                     resolve(response.token);
@@ -490,10 +515,7 @@ async function executeUpload(imgUrl, vidUrl, pageUrl, tags, memo, folder) {
             });
         });
 
-        if (!token) {
-            showDeferenceToast("🔒 로그인 후 다시 시도해주세요. (홈페이지 접속 필요)");
-            return;
-        }
+        if (!token) return false;
 
         let blob;
         try { 
@@ -510,7 +532,7 @@ async function executeUpload(imgUrl, vidUrl, pageUrl, tags, memo, folder) {
         const formData = new FormData();
         formData.append("file", compressedBlob, `collect_${Date.now()}.webp`);
 
-        // 1. R2 업로드
+        // 1. R2 upload
         const cfRes = await fetch(`${WORKER_URL}/upload`, { 
             method: "POST", 
             headers: { "Authorization": `Bearer ${token}` },
@@ -518,9 +540,9 @@ async function executeUpload(imgUrl, vidUrl, pageUrl, tags, memo, folder) {
         });
         const cfData = await cfRes.json();
 
-        if (!cfData.success) throw new Error("Cloudflare R2 upload failed");
+        if (!cfData.success) throw new Error("R2 upload failed");
 
-        // 2. D1 저장
+        // 2. D1 save
         const dbRes = await fetch(`${WORKER_URL}/assets`, { 
             method: "POST", 
             headers: { 
@@ -537,11 +559,14 @@ async function executeUpload(imgUrl, vidUrl, pageUrl, tags, memo, folder) {
             }) 
         });
 
-        if (!dbRes.ok) throw new Error("Cloudflare D1 save failed");
+        if (!dbRes.ok) throw new Error("D1 save failed");
+
+        showDeferenceToast("💎 ARCHIVED!", true);
+        return true;
 
     } catch (e) { 
-        console.error("수집 에러:", e);
-        showDeferenceToast("ARCHIVE FAILED"); 
+        console.error("Archive engine error:", e);
+        return false; 
     }
 }
 
