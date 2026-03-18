@@ -59,6 +59,21 @@ export function useApi() {
     });
   }, [fetchWithAuth]);
 
+  const updateAsset = useCallback(async (id, data) => {
+    return fetchWithAuth('/assets', {
+      method: "PUT",
+      body: JSON.stringify({ ...data, id })
+    });
+  }, [fetchWithAuth]);
+
+  const deleteAsset = useCallback(async (id, fileName) => {
+    let url = `/assets?id=${id}`;
+    if (fileName) url += `&fileName=${fileName}`;
+    return fetchWithAuth(url, {
+      method: "DELETE"
+    });
+  }, [fetchWithAuth]);
+
   const getAssets = useCallback(async () => {
     return fetchWithAuth('/assets');
   }, [fetchWithAuth]);
@@ -144,6 +159,8 @@ export function useApi() {
   return useMemo(() => ({
     fetchWithAuth,
     saveAsset,
+    updateAsset,
+    deleteAsset,
     getAssets,
     saveBookmark,
     getBookmarks,
@@ -160,6 +177,8 @@ export function useApi() {
   }), [
     fetchWithAuth,
     saveAsset,
+    updateAsset,
+    deleteAsset,
     getAssets,
     saveBookmark,
     getBookmarks,

@@ -20,17 +20,17 @@ let isDrawing = false, isMoving = false, isResizing = false;
 let startX, startY, startLeft, startTop, startWidth, startHeight, resizeDir;
 let captureRect = null;
 
-let currentRatio = 'free'; 
+let currentRatio = 'free';
 const ratios = { 'free': 'free', '1:1': 1, '4:5': 4 / 5, '5:4': 5 / 4, '16:9': 16 / 9, '9:16': 9 / 16 };
 
 /* ==========================================
    [섹션 2] 유틸리티: URL 정리
    ========================================== */
 function getCleanUrl(url) {
-    try { 
-        const u = new URL(url); 
-        ['utm_source', 'utm_medium', 'utm_campaign', 'ref', 'fbclid', 'gclid'].forEach(j => u.searchParams.delete(j)); 
-        return u.toString().replace(/\/$/, ""); 
+    try {
+        const u = new URL(url);
+        ['utm_source', 'utm_medium', 'utm_campaign', 'ref', 'fbclid', 'gclid'].forEach(j => u.searchParams.delete(j));
+        return u.toString().replace(/\/$/, "");
     } catch (e) { return url; }
 }
 
@@ -66,7 +66,7 @@ function extractThumbnailFromUrl(videoUrl) {
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth || 1280; canvas.height = video.videoHeight || 720;
                 canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/jpeg', 0.9)); 
+                resolve(canvas.toDataURL('image/jpeg', 0.9));
             } catch (e) { resolve(null); }
         };
         video.onerror = () => { clearTimeout(timeoutId); resolve(null); };
@@ -101,7 +101,7 @@ function showDeferenceToast(message, isSuccess = false) {
 
     let t = document.createElement('div');
     t.id = 'def-toast';
-    
+
     // 💡 변경점 1: display:flex로 요소를 가로 정렬하고, pointer-events를 auto로 바꿔서 클릭이 가능하게 합니다.
     t.style.cssText = `
         position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
@@ -111,7 +111,7 @@ function showDeferenceToast(message, isSuccess = false) {
         pointer-events: auto; transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1); 
         opacity: 0; letter-spacing: -0.2px; display: flex; align-items: center; gap: 14px;
     `;
-    
+
     // 💡 변경점 2: 수집 성공 시(ARCHIVED)에만 갤러리 이동 버튼을 렌더링합니다.
     if (message.includes("ARCHIVED") || isSuccess) {
         t.innerHTML = `
@@ -135,7 +135,7 @@ function showDeferenceToast(message, isSuccess = false) {
         setTimeout(() => {
             t.style.opacity = '0';
             t.style.bottom = '50px';
-            setTimeout(() => { if(t) t.remove() }, 400);
+            setTimeout(() => { if (t) t.remove() }, 400);
         }, 4000);
 
     } else {
@@ -151,41 +151,61 @@ function showDeferenceToast(message, isSuccess = false) {
         setTimeout(() => {
             t.style.opacity = '0';
             t.style.bottom = '50px';
-            setTimeout(() => { if(t) t.remove() }, 400);
+            setTimeout(() => { if (t) t.remove() }, 400);
         }, 3000);
     }
 }
 
 /* ==========================================
-   [섹션 6] 이벤트 리스너: 마우스 우클릭 감지
+   [섹션 6] 이벤트 리스너: 마우스 우클릭 감지 (GIF/비디오 추적 강화 🚀)
    ========================================== */
 document.addEventListener("contextmenu", (e) => {
     const els = document.elementsFromPoint(e.clientX, e.clientY);
     if (!els || !els[0]) return;
     let bestMedia = null, bestLink = null;
-    
+
     for (let el of els) {
         const a = el.closest('a');
-        if (a && a.href && !a.href.match(/\.(jpeg|jpg|gif|png|webp|avif|mp4|webm)(\?.*)?$/i) && !a.href.startsWith('javascript:')) { bestLink = a.href; break; }
+        if (a && a.href && !a.href.startsWith('javascript:')) {
+            // 💡 수정: 링크 자체가 미디어 파일(.gif, .mp4 등)인지 확인
+            if (a.href.match(/\.(jpeg|jpg|gif|png|webp|avif|mp4|webm)(\?.*)?$/i)) {
+                bestLink = a.href;
+                // 원본 링크가 gif나 비디오면 이것을 최우선 미디어로 취급!
+                if (a.href.match(/\.(gif|mp4|webm)(\?.*)?$/i)) {
+                    bestMedia = {
+                        url: a.href,
+                        type: a.href.match(/\.(mp4|webm)(\?.*)?$/i) ? 'video' : 'image',
+                        isBlob: false,
+                        element: el
+                    };
+                }
+                break;
+            } else {
+                bestLink = a.href; // 일반 페이지 링크
+            }
+        }
     }
-    
+
     const container = els[0].closest('article, [data-test-id="pin"], .dribbble-shot, .shot-thumbnail, .rf-project-cover, .ProjectCover-root, .Cover-wrapper, .Grid__Item, [class*="card"], [class*="project"], [class*="item"], a');
-    
-    for (let el of els) { if (el.tagName === 'VIDEO') { bestMedia = extractMediaFromElement(el); break; } }
-    
-    if (!bestMedia && container) { for (let v of container.querySelectorAll('video')) { const ex = extractMediaFromElement(v); if (ex) { bestMedia = ex; break; } } }
-    
+
+    // 이미 원본 미디어를 a 태그에서 찾았다면 패스, 아니면 기존처럼 탐색
     if (!bestMedia) {
-        for (let el of els) { if (el.tagName === 'IMG') { bestMedia = extractMediaFromElement(el); break; } }
-        if (!bestMedia && container) { for (let img of container.querySelectorAll('img')) { if (img.offsetWidth > 100) { const ex = extractMediaFromElement(img); if (ex) { bestMedia = ex; break; } } } }
+        for (let el of els) { if (el.tagName === 'VIDEO') { bestMedia = extractMediaFromElement(el); break; } }
+        if (!bestMedia && container) { for (let v of container.querySelectorAll('video')) { const ex = extractMediaFromElement(v); if (ex) { bestMedia = ex; break; } } }
+
+        if (!bestMedia) {
+            for (let el of els) { if (el.tagName === 'IMG') { bestMedia = extractMediaFromElement(el); break; } }
+            if (!bestMedia && container) { for (let img of container.querySelectorAll('img')) { if (img.offsetWidth > 100) { const ex = extractMediaFromElement(img); if (ex) { bestMedia = ex; break; } } } }
+        }
     }
-    
-    let pageUrl = window.location.href; 
+
+    let pageUrl = window.location.href;
     const isDetail = pageUrl.includes('/gallery/') || pageUrl.includes('/project/') || pageUrl.includes('/pin/') || (pageUrl.includes('dribbble.com/shots/') && !pageUrl.endsWith('shots/'));
-    if (bestLink && !isDetail) pageUrl = bestLink;
-    
+    // 미디어 직접 링크가 아닌 경우에만 pageUrl 교체
+    if (bestLink && !isDetail && !bestLink.match(/\.(jpeg|jpg|gif|png|webp|avif|mp4|webm)(\?.*)?$/i)) pageUrl = bestLink;
+
     lastRightClickData = { media: bestMedia, link: getCleanUrl(pageUrl) };
-}, true); 
+}, true);
 
 /* ==========================================
    [섹션 7] 통신: 백그라운드 메시지 수신 및 분기
@@ -196,45 +216,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     if (request.action === "direct-collect") handleDirectCollect(request);
-    else if (request.action === "start-selection") startSelection(); 
-    else if (request.action === "crop-and-upload") cropAndUpload(request.fullDataUrl, request.rect); 
-    // ✨ [핵심 추가] 백그라운드에서 "원본 다운로드" 무전이 왔을 때!
+    else if (request.action === "start-selection") startSelection();
+    else if (request.action === "crop-and-upload") cropAndUpload(request.fullDataUrl, request.rect);
     else if (request.action === "download-original") handleDownloadOriginal(request);
 });
 
-// ✨ [새로운 기능] 우클릭한 미디어의 원본 URL을 찾아서 다운로드 본부로 전달!
 async function handleDownloadOriginal(request) {
     let finalUrl = null;
 
-    // 1. 우클릭했던 위치에서 가장 화질 좋은 미디어를 찾아냅니다.
     if (lastRightClickData && lastRightClickData.media) {
         const media = lastRightClickData.media;
         if (media.type === 'video') {
-            // 비디오가 보호된 형식(Blob)이면 썸네일이라도, 아니면 원본 비디오 URL을 가져옵니다.
             finalUrl = (media.isBlob) ? findPosterImage(media.element) : media.url;
         } else {
-            finalUrl = media.url; // 고화질 이미지 URL
+            finalUrl = media.url;
         }
     } else if (request.srcUrl) {
-        // 백업 플랜: 브라우저가 기본적으로 잡은 이미지 URL
         finalUrl = request.srcUrl;
     }
 
-    // 2. URL을 찾았다면 백그라운드 본부에 "다운로드 실행해!" 라고 무전을 칩니다.
     if (finalUrl) {
         showDeferenceToast("⬇️ 원본 파일 다운로드를 시작합니다...");
-        
-        // 간단한 확장자 추출 로직 (파일명이 예쁘게 저장되도록)
         let ext = "jpg";
         if (finalUrl.toLowerCase().includes(".png")) ext = "png";
         else if (finalUrl.toLowerCase().includes(".webp")) ext = "webp";
         else if (finalUrl.toLowerCase().includes(".mp4")) ext = "mp4";
         else if (finalUrl.toLowerCase().includes(".gif")) ext = "gif";
 
-        chrome.runtime.sendMessage({ 
-            action: "trigger-download", 
+        chrome.runtime.sendMessage({
+            action: "trigger-download",
             url: finalUrl,
-            filename: `Deference_Original_${Date.now()}.${ext}` // 예: Deference_Original_1701234567.png
+            filename: `Deference_Original_${Date.now()}.${ext}`
         });
     } else {
         showDeferenceToast("❌ 다운로드할 원본 미디어를 찾지 못했습니다.");
@@ -251,7 +263,7 @@ async function handleDirectCollect(request) {
         if (media.type === 'video') {
             if (media.isBlob) {
                 showDeferenceToast("🔒 플랫폼 보안 정책으로 보호된 영상입니다. 썸네일과 출처 링크만 아카이브됩니다.");
-                finalVidUrl = null; finalImgUrl = findPosterImage(media.element); 
+                finalVidUrl = null; finalImgUrl = findPosterImage(media.element);
             } else {
                 showDeferenceToast("⏳ 고화질 썸네일을 추출 중입니다...");
                 finalImgUrl = await extractThumbnailFromUrl(finalVidUrl);
@@ -260,8 +272,12 @@ async function handleDirectCollect(request) {
         } else { finalImgUrl = media.url; }
         showPreSaveModal(finalImgUrl, finalVidUrl, sourceLink);
     } else if (request.srcUrl) {
-        showPreSaveModal(request.srcUrl, null, getCleanUrl(window.location.href));
-    } 
+        // 💡 수정: srcUrl 자체가 비디오 포맷인지 검사
+        const isVideoUrl = request.srcUrl.match(/\.(mp4|webm)(\?.*)?$/i);
+        const imgUrl = isVideoUrl ? null : request.srcUrl;
+        const vidUrl = isVideoUrl ? request.srcUrl : null;
+        showPreSaveModal(imgUrl, vidUrl, getCleanUrl(window.location.href));
+    }
 }
 
 /* ==========================================
@@ -277,7 +293,7 @@ function startSelection() {
 
     bottomToolbar = document.createElement('div'); bottomToolbar.id = 'def-bottom-toolbar';
     let ratioGroup = document.createElement('div'); ratioGroup.id = 'def-ratio-group';
-    
+
     Object.keys(ratios).forEach(key => {
         let btn = document.createElement('button'); btn.className = 'def-ratio-btn'; btn.innerText = key.toUpperCase();
         btn.onclick = (e) => {
@@ -301,7 +317,7 @@ function startSelection() {
     let xSpan = document.createElement('span'); xSpan.innerText = '×'; xSpan.style.cssText = 'color:rgba(255,255,255,0.4); font-size:12px; font-weight:bold;';
     let customH = document.createElement('input'); customH.type = 'number'; customH.className = 'def-custom-input'; customH.placeholder = 'H';
     let customBtn = document.createElement('button'); customBtn.className = 'def-ratio-btn'; customBtn.innerText = 'SET';
-    
+
     [customW, customH].forEach(inp => {
         inp.addEventListener('mousedown', (e) => e.stopPropagation());
         inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); customBtn.click(); } });
@@ -336,7 +352,7 @@ function startSelection() {
 
     const dirs = ['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'];
     dirs.forEach(dir => {
-        let h = document.createElement('div'); h.className = 'def-handle'; 
+        let h = document.createElement('div'); h.className = 'def-handle';
         if (dir.includes('n')) h.style.top = '0'; if (dir.includes('s')) h.style.top = '100%';
         if (dir.includes('w')) h.style.left = '0'; if (dir.includes('e')) h.style.left = '100%';
         if (dir === 'n' || dir === 's') { h.style.left = '50%'; h.style.cursor = 'ns-resize'; }
@@ -354,7 +370,7 @@ function startSelection() {
         if (result.defSavedRatio !== undefined) {
             currentRatio = result.defSavedRatio;
             let ratioKey = Object.keys(ratios).find(key => ratios[key] === currentRatio) || 'free';
-            if(ratioKey !== 'free') Array.from(ratioGroup.children).forEach(btn => { if (btn.innerText === ratioKey.toUpperCase()) btn.classList.add('active'); });
+            if (ratioKey !== 'free') Array.from(ratioGroup.children).forEach(btn => { if (btn.innerText === ratioKey.toUpperCase()) btn.classList.add('active'); });
             else if (currentRatio !== 'free') customBtn.classList.add('active');
             else ratioGroup.children[0].classList.add('active');
         } else ratioGroup.children[0].classList.add('active');
@@ -365,12 +381,13 @@ function startSelection() {
     selectionBox.addEventListener('mousedown', (e) => { if (e.target === selectionBox) { e.preventDefault(); isMoving = true; startX = e.clientX; startY = e.clientY; startLeft = captureRect.left; startTop = captureRect.top; } });
 
     mouseMoveHandler = (e) => {
-        if (isDrawing || isMoving || isResizing) e.preventDefault(); 
-        if (isDrawing) { 
+        if (isDrawing || isMoving || isResizing) e.preventDefault();
+        if (isDrawing) {
             let w = Math.abs(e.clientX - startX), h = Math.abs(e.clientY - startY);
             if (currentRatio !== 'free') { if (currentRatio >= 1) h = w / currentRatio; else w = h * currentRatio; }
             captureRect.width = w; captureRect.height = h; captureRect.left = e.clientX < startX ? startX - w : startX; captureRect.top = e.clientY < startY ? startY - h : startY; updateSelectionBox();
-        } else if (isMoving) { captureRect.left = startLeft + (e.clientX - startX); captureRect.top = startTop + (e.clientY - startY); updateSelectionBox();
+        } else if (isMoving) {
+            captureRect.left = startLeft + (e.clientX - startX); captureRect.top = startTop + (e.clientY - startY); updateSelectionBox();
         } else if (isResizing) {
             let dx = e.clientX - startX, dy = e.clientY - startY;
             if (currentRatio === 'free') {
@@ -406,7 +423,7 @@ function executeCapture() {
     if (!captureRect || captureRect.width < 20 || captureRect.height < 20) { removeOverlay(); return; }
     const cwInput = document.querySelector('.def-custom-input[placeholder="W"]'), chInput = document.querySelector('.def-custom-input[placeholder="H"]');
     chrome.storage.local.set({ defSavedRect: captureRect, defSavedRatio: currentRatio, defCustomW: cwInput ? cwInput.value : '', defCustomH: chInput ? chInput.value : '' });
-    overlay.classList.remove('has-selection'); selectionBox.style.display = 'none'; 
+    overlay.classList.remove('has-selection'); selectionBox.style.display = 'none';
     setTimeout(() => { chrome.runtime.sendMessage({ action: 'rect-ready', rect: captureRect }); removeOverlay(); }, 100);
 }
 
@@ -415,7 +432,7 @@ function removeOverlay() { if (overlay) { overlay.remove(); overlay = null; } if
 function cropAndUpload(fullDataUrl, rect) {
     const img = new Image(); img.onload = () => {
         const canvas = document.createElement('canvas'); canvas.width = rect.width; canvas.height = rect.height;
-        const ctx = canvas.getContext('2d'), dpr = window.devicePixelRatio || 1; 
+        const ctx = canvas.getContext('2d'), dpr = window.devicePixelRatio || 1;
         ctx.drawImage(img, rect.left * dpr, rect.top * dpr, rect.width * dpr, rect.height * dpr, 0, 0, rect.width, rect.height);
         showPreSaveModal(canvas.toDataURL('image/png'), null, window.location.href);
     };
@@ -458,13 +475,13 @@ function showPreSaveModal(imgUrl, vidUrl, sourceLink) {
             <button id="def-save" style="flex:2; padding:12px; background:#000; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:12px;">ARCHIVE</button>
         </div>
     `;
-    
+
     modalWrap.appendChild(modalBox); document.body.appendChild(modalWrap);
     const tagIn = document.getElementById('def-tag-in'), saveBtn = document.getElementById('def-save');
     setTimeout(() => tagIn.focus(), 50);
     tagIn.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); saveBtn.click(); } };
     document.getElementById('def-cancel').onclick = () => { modalWrap.remove(); isModalOpen = false; };
-    
+
     saveBtn.onclick = async () => {
         const tags = tagIn.value, memo = document.getElementById('def-memo-in').value;
         const originalContent = modalBox.innerHTML;
@@ -475,11 +492,11 @@ function showPreSaveModal(imgUrl, vidUrl, sourceLink) {
             </div>
             <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
         `;
-        
+
         try {
             const success = await executeUpload(imgUrl, vidUrl, sourceLink, tags, memo);
             if (success) {
-                modalWrap.remove(); 
+                modalWrap.remove();
                 isModalOpen = false;
             } else {
                 modalBox.innerHTML = originalContent;
@@ -518,45 +535,82 @@ async function executeUpload(imgUrl, vidUrl, pageUrl, tags, memo, folder) {
         if (!token) return false;
 
         let blob;
-        try { 
-            const res = await fetch(imgUrl); blob = await res.blob(); 
-        } catch (e) { 
-            const b64 = await new Promise((res) => { 
-                chrome.runtime.sendMessage({ action: "bypass-cors-fetch", url: imgUrl }, (r) => res(r.base64)); 
-            }); 
-            const br = await fetch(b64); blob = await br.blob(); 
+        try {
+            const res = await fetch(imgUrl); blob = await res.blob();
+        } catch (e) {
+            const b64 = await new Promise((res) => {
+                chrome.runtime.sendMessage({ action: "bypass-cors-fetch", url: imgUrl }, (r) => res(r.base64));
+            });
+            const br = await fetch(b64); blob = await br.blob();
         }
-        
-        const compressedBlob = await resizeAndCompress(blob);
-        
+
+        // GIF 여부 판별 (blob type 또는 URL로 확인)
+        const isGif = blob.type === 'image/gif' || imgUrl?.toLowerCase().includes('.gif');
+
+        let finalBlob, fileName;
+        if (isGif) {
+            // GIF는 압축 없이 원본 그대로 업로드 (애니메이션 보존 🎞️)
+            finalBlob = blob;
+            fileName = `collect_${Date.now()}.gif`;
+        } else {
+            // 일반 이미지는 WebP로 압축
+            finalBlob = await resizeAndCompress(blob);
+            fileName = `collect_${Date.now()}.webp`;
+        }
+
         const formData = new FormData();
-        formData.append("file", compressedBlob, `collect_${Date.now()}.webp`);
+        formData.append("file", finalBlob, fileName);
+
+        // 비디오가 있으면 별도로 R2에 업로드 시도
+        let finalVidUrl = vidUrl || "";
+        if (vidUrl && !vidUrl.startsWith('blob:')) {
+            try {
+                const vidRes = await fetch(vidUrl);
+                if (vidRes.ok) {
+                    const vidBlob = await vidRes.blob();
+                    const vidExt = vidBlob.type.includes('mp4') ? 'mp4' : 'webm';
+                    const vidForm = new FormData();
+                    vidForm.append("file", vidBlob, `collect_vid_${Date.now()}.${vidExt}`);
+                    const vidUpRes = await fetch(`${WORKER_URL}/upload`, {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${token}` },
+                        body: vidForm
+                    });
+                    const vidData = await vidUpRes.json();
+                    if (vidData.success) finalVidUrl = vidData.url; // R2 URL로 교체
+                }
+            } catch (e) {
+                console.warn("비디오 R2 업로드 실패, 원본 URL 사용:", e);
+                // 실패해도 원본 URL 유지
+            }
+        }
+
 
         // 1. R2 upload
-        const cfRes = await fetch(`${WORKER_URL}/upload`, { 
-            method: "POST", 
+        const cfRes = await fetch(`${WORKER_URL}/upload`, {
+            method: "POST",
             headers: { "Authorization": `Bearer ${token}` },
-            body: formData 
+            body: formData
         });
         const cfData = await cfRes.json();
 
         if (!cfData.success) throw new Error("R2 upload failed");
 
         // 2. D1 save
-        const dbRes = await fetch(`${WORKER_URL}/assets`, { 
-            method: "POST", 
-            headers: { 
+        const dbRes = await fetch(`${WORKER_URL}/assets`, {
+            method: "POST",
+            headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}` 
+                "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify({ 
-                image_url: cfData.url, 
-                video_url: vidUrl || "", 
-                page_url: pageUrl || "", 
-                tags: tags || "",  
+            body: JSON.stringify({
+                image_url: cfData.url,
+                video_url: finalVidUrl,
+                page_url: pageUrl || "",
+                tags: tags || "",
                 memo: memo || "",
-                folder: folder || "전체" 
-            }) 
+                folder: folder || "전체"
+            })
         });
 
         if (!dbRes.ok) throw new Error("D1 save failed");
@@ -564,9 +618,9 @@ async function executeUpload(imgUrl, vidUrl, pageUrl, tags, memo, folder) {
         showDeferenceToast("💎 저장 완료!", true);
         return true;
 
-    } catch (e) { 
+    } catch (e) {
         console.error("Archive engine error:", e);
-        return false; 
+        return false;
     }
 }
 
@@ -580,7 +634,7 @@ function resizeAndCompress(file) {
             img.src = e.target.result;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                let w = img.width, h = img.height, MAX = 1200; 
+                let w = img.width, h = img.height, MAX = 1200;
                 if (w > MAX) { h = (MAX / w) * h; w = MAX; }
                 canvas.width = w; canvas.height = h;
                 const ctx = canvas.getContext('2d');
@@ -616,18 +670,18 @@ function openBatchSaveUI() {
     function getExt(url) {
         const clean = url.split('?')[0].toLowerCase();
         const ext = clean.split('.').pop();
-        return ['jpg','jpeg','png','gif','webp','svg','mp4'].includes(ext) ? ext : 'unknown';
+        return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'mp4'].includes(ext) ? ext : 'unknown';
     }
 
     // 이미지 추출
     document.querySelectorAll('img').forEach(img => {
         let src = img.srcset ? img.srcset.split(',').pop().trim().split(' ')[0] : (img.currentSrc || img.src);
         if (src && src.startsWith('http') && !src.includes('transparent') && img.naturalWidth > 100) {
-            mediaMap.set(src, { 
-                url: src, 
-                width: img.naturalWidth, 
-                height: img.naturalHeight, 
-                ext: getExt(src) 
+            mediaMap.set(src, {
+                url: src,
+                width: img.naturalWidth,
+                height: img.naturalHeight,
+                ext: getExt(src)
             });
         }
     });
@@ -656,7 +710,7 @@ function openBatchSaveUI() {
     const host = document.createElement('div');
     host.id = 'def-batch-host';
     host.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:2147483647;';
-    
+
     // 타겟 페이지 CSS 충돌을 완벽 방지하는 Shadow DOM 🌟
     const shadow = host.attachShadow({ mode: 'open' });
 
@@ -690,13 +744,13 @@ function openBatchSaveUI() {
     // 메인 컨테이너 (좌측 목록, 우측 패널)
     const mainWrap = document.createElement('div');
     mainWrap.style.cssText = `display:flex; flex:1; overflow:hidden;`;
-    
+
     const gridWrap = document.createElement('div');
     gridWrap.style.cssText = `flex:1; overflow-y:auto; padding:24px; display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:24px; align-content:start;`;
-    
+
     const sidebar = document.createElement('div');
     sidebar.style.cssText = `width:300px; background:#fff; border-left:1px solid #e1e4e8; display:flex; flex-direction:column; overflow-y:auto;`;
-    
+
     sidebar.innerHTML = `
         <div style="padding:24px; flex:1;">
             <div style="margin-bottom:24px;">
@@ -737,13 +791,13 @@ function openBatchSaveUI() {
     mediaList.forEach((item, idx) => {
         const cardBox = document.createElement('div');
         const displayType = item.ext === 'mp4' ? 'mp4' : (item.ext === 'svg' ? 'svg' : 'img');
-        
+
         cardBox.style.cssText = `display:flex; flex-direction:column; gap:8px;`;
         cardBox.dataset.type = displayType;
 
         const card = document.createElement('div');
         card.style.cssText = `position:relative; aspect-ratio:3/4; background:${item.ext === 'svg' ? '#eef0f2' : '#fff'}; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.04); cursor:pointer; border:2px solid transparent; transition:all 0.15s ease;`;
-        
+
         card.innerHTML = `
             <img src="${item.url}" style="width:100%; height:100%; object-fit:${item.ext === 'svg' ? 'contain' : 'cover'}; pointer-events:none;">
             ${item.ext === 'mp4' ? `<div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:32px; height:32px; background:rgba(0,0,0,0.6); border-radius:50%; display:flex; justify-content:center; align-items:center;"><span style="color:#fff; font-size:12px;">▶</span></div>` : ''}
@@ -756,8 +810,8 @@ function openBatchSaveUI() {
         metaInfo.style.cssText = `font-size:12px; color:#666; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;`;
         metaInfo.innerText = `${item.width > 0 ? `${item.width} × ${item.height} / ` : ''}${item.ext.toUpperCase()}`;
 
-        card.onmouseenter = () => { if(!selectedUrls.has(item.url)) card.querySelector('.def-batch-check').style.opacity = '1'; };
-        card.onmouseleave = () => { if(!selectedUrls.has(item.url)) card.querySelector('.def-batch-check').style.opacity = '0'; };
+        card.onmouseenter = () => { if (!selectedUrls.has(item.url)) card.querySelector('.def-batch-check').style.opacity = '1'; };
+        card.onmouseleave = () => { if (!selectedUrls.has(item.url)) card.querySelector('.def-batch-check').style.opacity = '0'; };
 
         card.onclick = () => {
             const checkIcon = card.querySelector('.def-batch-check');
@@ -788,10 +842,10 @@ function openBatchSaveUI() {
     document.body.appendChild(host);
     document.body.style.overflow = 'hidden';
 
-// ✨ [수정됨] 클라우드플레어 D1(collections)에서 실제 폴더 목록 불러오기
+    // ✨ [수정됨] 클라우드플레어 D1(collections)에서 실제 폴더 목록 불러오기
     function loadUserFolders() {
         const folderSelect = shadow.getElementById('def-batch-folder');
-        
+
         // 1. background.js에 저장된 Clerk 토큰 가져오기
         chrome.runtime.sendMessage({ action: "get-clerk-token" }, async (response) => {
             const token = response.token;
@@ -801,9 +855,9 @@ function openBatchSaveUI() {
             }
 
             try {
-                
+
                 const apiUrl = 'https://def-api.deference.workers.dev/collections';
-                
+
                 const res = await fetch(apiUrl, {
                     method: 'GET',
                     headers: {
@@ -840,12 +894,12 @@ function openBatchSaveUI() {
         const count = selectedUrls.size;
         headerTitle.innerText = `(${count} / ${mediaList.length})`;
         submitBtn.innerText = `${count}개 다운로드`;
-        
+
         if (count > 0) {
-            submitBtn.style.opacity = '1'; 
+            submitBtn.style.opacity = '1';
             submitBtn.style.pointerEvents = 'auto';
         } else {
-            submitBtn.style.opacity = '0.5'; 
+            submitBtn.style.opacity = '0.5';
             submitBtn.style.pointerEvents = 'none';
         }
     }
@@ -854,7 +908,7 @@ function openBatchSaveUI() {
     shadow.getElementById('def-batch-select-all').onclick = () => {
         const visibleCards = cards.filter(c => c.style.display !== 'none');
         const allSelected = visibleCards.every(c => selectedUrls.has(c.querySelector('img').src));
-        
+
         visibleCards.forEach(c => {
             const url = c.querySelector('img').src;
             if (allSelected) {
@@ -877,16 +931,16 @@ function openBatchSaveUI() {
     const filters = shadow.querySelectorAll('.def-filter');
     filters.forEach(f => {
         f.addEventListener('change', (e) => {
-            if(e.target.value === 'all') {
-                filters.forEach(cb => { if(cb !== e.target) cb.checked = false; });
+            if (e.target.value === 'all') {
+                filters.forEach(cb => { if (cb !== e.target) cb.checked = false; });
             } else {
                 shadow.querySelector('.def-filter[value="all"]').checked = false;
             }
-            
+
             const checkedValues = Array.from(filters).filter(cb => cb.checked).map(cb => cb.value);
-            
+
             cards.forEach(card => {
-                if(checkedValues.includes('all') || checkedValues.includes(card.dataset.type)) {
+                if (checkedValues.includes('all') || checkedValues.includes(card.dataset.type)) {
                     card.style.display = 'flex';
                 } else {
                     card.style.display = 'none';
@@ -908,10 +962,10 @@ function openBatchSaveUI() {
         // 우측 사이드바에서 유저가 입력한 태그와 폴더 가져오기
         const userFolder = shadow.getElementById('def-batch-folder').value;
         const userInputTags = shadow.getElementById('def-batch-tags').value;
-        
+
         let successCount = 0;
-        const pageUrl = window.location.href; 
-        
+        const pageUrl = window.location.href;
+
         // ✅ 수정된 코드 (유저가 입력한 값만 깔끔하게 넘김)
         let finalTags = userInputTags.trim();
 
@@ -924,7 +978,7 @@ function openBatchSaveUI() {
         }
 
         showDeferenceToast(`🎉 성공적으로 ${successCount}개의 미디어를 저장했습니다!`, true);
-        host.remove(); 
+        host.remove();
         document.body.style.overflow = 'auto';
     };
 }
@@ -967,10 +1021,10 @@ async function executeFullPageCapture() {
     // ✨ [전략 A 핵심] 시선을 유도할 투명한 '닻(Anchor)' 엘리먼트 생성
     const anchor = document.createElement('div');
     anchor.style.cssText = "position:absolute; left:0; width:1px; height:1px; background:transparent; pointer-events:none; z-index:-9999;";
-    
+
     // 타겟 상자 안에 닻을 던져 넣습니다.
     if (!isWindow && window.getComputedStyle(scrollEl).position === 'static') {
-        scrollEl.style.position = 'relative'; 
+        scrollEl.style.position = 'relative';
     }
     (isWindow ? document.body : scrollEl).appendChild(anchor);
 
@@ -1011,7 +1065,7 @@ async function executeFullPageCapture() {
         }
 
         const previousY = currentY;
-        
+
         // ✨ [전략 A] 다음 목표 지점(현재 위치 + 화면 높이)에 닻을 내립니다.
         const targetY = currentY + viewportHeight;
         anchor.style.top = `${targetY}px`;
@@ -1020,7 +1074,7 @@ async function executeFullPageCapture() {
         anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
         // 브라우저가 네이티브하게 스크롤을 내리고, 사이트가 새 사진을 불러올 시간을 넉넉히 줍니다.
-        await new Promise(r => setTimeout(r, 1000)); 
+        await new Promise(r => setTimeout(r, 1000));
 
         // 이동 후 실제 좌표 확인
         currentY = isWindow ? window.scrollY : scrollEl.scrollTop;
@@ -1031,7 +1085,7 @@ async function executeFullPageCapture() {
                 const finalImg = await captureFrame();
                 if (finalImg) capturedImages.push({ img: finalImg, y: currentY });
             }
-            break; 
+            break;
         }
         pageCount++;
     }
@@ -1067,8 +1121,8 @@ async function executeFullPageCapture() {
 let defSyncInterval = null;
 
 function syncAuthToken() {
-    const token = localStorage.getItem('__clerk_db_jwt') || 
-                  document.cookie.split('; ').find(row => row.startsWith('__session'))?.split('=')[1];
+    const token = localStorage.getItem('__clerk_db_jwt') ||
+        document.cookie.split('; ').find(row => row.startsWith('__session'))?.split('=')[1];
 
     if (token) {
         try {
