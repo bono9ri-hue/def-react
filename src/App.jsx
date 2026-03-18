@@ -215,7 +215,7 @@ function Dashboard() {
           </nav>
 
           <div className="mt-8 mb-2 px-3">
-             <span className="text-[10px] font-black text-contentMuted uppercase tracking-[0.2em]">라이브러리</span>
+             <span className="text-[10px] font-black text-content uppercase tracking-[0.2em]">라이브러리</span>
           </div>
           <nav className="flex flex-col gap-1">
             <NavBtn active={activeTab === 'gallery'} onClick={() => setActiveTab('gallery')} icon={<ImageIcon size={16}/>} label="갤러리" />
@@ -224,7 +224,7 @@ function Dashboard() {
           </nav>
 
           <div className="mt-8 mb-2 px-3 flex items-center justify-between">
-             <span className="text-[10px] font-black text-contentMuted uppercase tracking-[0.2em]">컬렉션</span>
+             <span className="text-[10px] font-black text-content uppercase tracking-[0.2em]">Collections</span>
              <button onClick={() => setIsCreatingCollection(true)} className="p-1 hover:bg-hover rounded-md transition-colors"><Plus size={14}/></button>
           </div>
           <nav className="flex flex-col gap-1 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
@@ -240,7 +240,7 @@ function Dashboard() {
                 label={col.name} 
               />
             ))}
-            {collections.length === 0 && <span className="px-3 py-2 text-[11px] text-contentMuted italic">생성된 컬렉션 없음</span>}
+            {collections.length === 0 && <span className="px-3 py-2 text-[11px] text-content italic">생성된 컬렉션 없음</span>}
           </nav>
         </div>
 
@@ -580,10 +580,10 @@ function NavBtn({ icon, label, active, onClick, badge }) {
   return (
     <button 
       onClick={onClick}
-      className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group ${active ? 'bg-surface text-content shadow-sm border border-border/50' : 'text-contentMuted hover:text-content hover:bg-hover'}`}
+      className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group ${active ? 'bg-surface text-content shadow-sm border border-border/50' : 'text-content hover:bg-hover'}`}
     >
       <div className="flex items-center gap-3">
-        <span className={`${active ? 'text-accent-main' : 'text-contentMuted group-hover:text-content'} transition-colors`}>{icon}</span>
+        <span className={`${active ? 'text-accent-main' : 'text-content group-hover:text-content'} transition-colors`}>{icon}</span>
         <span className={`text-[13px] ${active ? 'font-bold' : 'font-semibold'}`}>{label}</span>
       </div>
       {badge && <span className="text-[10px] font-black bg-hover px-1.5 py-0.5 rounded-md min-w-[20px] text-center">{badge}</span>}
