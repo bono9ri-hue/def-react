@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/chrome-extension';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 const WORKER_URL = "https://def-api.deference.workers.dev";
 
@@ -85,6 +85,19 @@ export function useApi() {
     });
   }, [fetchWithAuth]);
   
+  const updateCollection = useCallback(async (id, name) => {
+    return fetchWithAuth('/collections', {
+      method: "PUT",
+      body: JSON.stringify({ id, name })
+    });
+  }, [fetchWithAuth]);
+
+  const deleteCollection = useCallback(async (id) => {
+    return fetchWithAuth(`/collections?id=${id}`, {
+      method: "DELETE"
+    });
+  }, [fetchWithAuth]);
+
   const uploadFile = useCallback(async (file) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -108,23 +121,57 @@ export function useApi() {
     });
   }, [fetchWithAuth]);
 
+  const updateCollectionOrder = useCallback(async (collectionsArray) => {
+    return fetchWithAuth('/collections', {
+      method: "PUT",
+      body: JSON.stringify(collectionsArray)
+    });
+  }, [fetchWithAuth]);
+
+  const togglePinCollection = useCallback(async (id, isPinned) => {
+    return fetchWithAuth('/collections', {
+      method: "PUT",
+      body: JSON.stringify({ id, is_pinned: isPinned })
+    });
+  }, [fetchWithAuth]);
+
   const deleteBookmark = useCallback(async (id) => {
     return fetchWithAuth(`/bookmarks?id=${id}`, {
       method: "DELETE"
     });
   }, [fetchWithAuth]);
 
-  return {
+  return useMemo(() => ({
     fetchWithAuth,
     saveAsset,
     getAssets,
     saveBookmark,
     getBookmarks,
     updateBookmark,
-    updateBookmarkOrder, // 🌟 추가
+    updateBookmarkOrder,
+    updateCollectionOrder,
+    togglePinCollection,
     deleteBookmark,
     getCollections,
     saveCollection,
+    updateCollection,
+    deleteCollection,
     uploadFile
-  };
+  }), [
+    fetchWithAuth,
+    saveAsset,
+    getAssets,
+    saveBookmark,
+    getBookmarks,
+    updateBookmark,
+    updateBookmarkOrder,
+    updateCollectionOrder,
+    togglePinCollection,
+    deleteBookmark,
+    getCollections,
+    saveCollection,
+    updateCollection,
+    deleteCollection,
+    uploadFile
+  ]);
 }

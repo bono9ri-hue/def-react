@@ -10,7 +10,7 @@
     
     /* Premium Minimalist Colors */
     --bg-primary: #ffffff;
-    --bg-sidebar: #f7f7f7;
+    --bg-sidebar: #ffffff;
     --bg-surface: #ffffff;
     --bg-hover: #efefef;
     --border-color: #e5e5e5;
@@ -80,6 +80,15 @@ body {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+}
+
+/* Hide scrollbar for cleaner UI */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Animations */
