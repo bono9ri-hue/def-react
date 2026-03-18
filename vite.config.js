@@ -7,7 +7,7 @@ import manifest from './extension/manifest.json'
 export default defineConfig({
   plugins: [
     react(), 
-    // ...(!process.env.VERCEL ? [crx({ manifest })] : [])
+    crx({ manifest })
   ],
   resolve: {
     alias: {

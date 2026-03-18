@@ -12,12 +12,12 @@
     "identity"
   ],
   "host_permissions": ["<all_urls>"],
-  "action": { "default_popup": "popup.html" },
-  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "extension/popup.html" },
+  "background": { "service_worker": "extension/background.js", "type": "module" },
   "content_scripts": [{
     "matches": ["<all_urls>"],
-    "js": ["content.js"],
-    "css": ["content.css"] 
+    "js": ["extension/content.js"],
+    "css": ["extension/content.css"] 
   }],
   "externally_connectable": {
     "matches": [
