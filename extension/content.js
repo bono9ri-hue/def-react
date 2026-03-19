@@ -609,7 +609,8 @@ async function executeUpload(imgUrl, vidUrl, pageUrl, tags, memo, folder) {
                 page_url: pageUrl || "",
                 tags: tags || "",
                 memo: memo || "",
-                folder: folder || "전체"
+                folder: folder || "전체",
+                item_type: finalVidUrl ? "video" : "image"
             })
         });
 
