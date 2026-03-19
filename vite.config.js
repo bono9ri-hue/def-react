@@ -7,7 +7,7 @@ import manifest from './extension/manifest.json'
 export default defineConfig({
   plugins: [
     react(), 
-    ...(!process.env.VERCEL ? [crx({ manifest })] : [])
+    ...(!process.env.VERCEL && !process.env.VITE_WEB ? [crx({ manifest })] : [])
   ],
   resolve: {
     alias: {
@@ -15,6 +15,7 @@ export default defineConfig({
     }
   },
   server: {
+    host: true,
     port: 5173,
     strictPort: true,
     hmr: {

@@ -9,7 +9,7 @@ console.log("Deference: 수집 요원(Content Script)이 현장에 도착했습�
 /* ==========================================
    [섹션 1] 전역 변수 및 설정
    ========================================== */
-const WORKER_URL = "https://def-api.deference.workers.dev";
+const WORKER_URL = import.meta.env.VITE_API_URL || "https://def-api.deference.workers.dev";
 
 let lastRightClickData = null;
 let isModalOpen = false;

@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/chrome-extension';
 import { useCallback, useMemo } from 'react';
 
-const WORKER_URL = "https://def-api.deference.workers.dev";
+const WORKER_URL = import.meta.env.VITE_API_URL || "https://def-api.deference.workers.dev";
 
 export function useApi() {
   const { getToken } = useAuth();
@@ -74,8 +74,8 @@ export function useApi() {
     });
   }, [fetchWithAuth]);
 
-  const getAssets = useCallback(async () => {
-    return fetchWithAuth('/assets');
+  const getAssets = useCallback(async (status = 'active') => {
+    return fetchWithAuth(`/assets?status=${status}`);
   }, [fetchWithAuth]);
 
   const saveBookmark = useCallback(async (bookmarkData) => {

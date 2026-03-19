@@ -60,9 +60,10 @@ export default {
       // [2] 자산 목록 (D1 장부) : GET /assets
       // ==========================================
       if (path === "/assets" && request.method === "GET") {
+        const status = url.searchParams.get("status") || "active";
         const { results } = await env.DB.prepare(
-          "SELECT * FROM assets WHERE user_id = ? ORDER BY created_at DESC"
-        ).bind(userId).all();
+          "SELECT * FROM assets WHERE user_id = ? AND status = ? ORDER BY created_at DESC"
+        ).bind(userId, status).all();
 
         return new Response(JSON.stringify(results), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -78,8 +79,8 @@ export default {
         const query = `
           INSERT INTO assets (
             user_id, item_type, image_url, video_url, page_url, 
-            memo, tags, folder, palette_data, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            memo, tags, folder, palette_data, created_at, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'active')
         `;
         
         await env.DB.prepare(query).bind(
@@ -109,6 +110,7 @@ export default {
         if (body.tags !== undefined) await env.DB.prepare("UPDATE assets SET tags = ? WHERE id = ? AND user_id = ?").bind(body.tags, id, userId).run();
         if (body.folder !== undefined) await env.DB.prepare("UPDATE assets SET folder = ? WHERE id = ? AND user_id = ?").bind(body.folder, id, userId).run();
         if (body.palette_data !== undefined) await env.DB.prepare("UPDATE assets SET palette_data = ? WHERE id = ? AND user_id = ?").bind(body.palette_data, id, userId).run();
+        if (body.status !== undefined) await env.DB.prepare("UPDATE assets SET status = ? WHERE id = ? AND user_id = ?").bind(body.status, id, userId).run();
 
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }

@@ -9,7 +9,7 @@ import { useApi } from './hooks/useApi';
 import {
   Home,
   Bookmark,
-  Image as ImageIcon,
+  Image,
   Grid,
   Search,
   Folder,
@@ -27,15 +27,14 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronLeft,
-  ChevronRight as ChevronRightIcon,
-  Minus,
-  RefreshCw,
-  X,
-  Pin,
-  PinOff,
-  Layout,
   LayoutGrid,
-  List as ListIcon
+  List,
+  Trash2,
+  RefreshCw,
+  LayoutDashboard as Layout,
+  X,
+  Copy,
+  Columns
 } from 'lucide-react';
 
 /* ============================================================
@@ -568,47 +567,98 @@ function Dashboard() {
 
   // 1️⃣ 단일 삭제: 이미지 상세 모달에서 '삭제' 클릭 시
   const handleDeleteAsset = async (id, fileName) => {
-    if (!window.confirm("정말 이 이미지를 삭제하시겠습니까?")) return;
+    const isTrash = activeTab === 'trash';
+    const confirmMsg = isTrash 
+      ? "정말 이 이미지를 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다." 
+      : "이미지를 휴지통으로 이동하시겠습니까?";
+    
+    if (!window.confirm(confirmMsg)) return;
+
     try {
-      await deleteAsset(id, fileName);
-      // 서버 삭제 성공 시, 로컬 상태에서도 즉시 제거해서 화면 갱신
-      setAssets(prev => prev.filter(a => a.id !== id));
-      showToast("이미지가 삭제되었습니다.", "success");
-      setIsImageModalOpen(false); // 모달 닫기
+      if (isTrash) {
+        await deleteAsset(id, fileName);
+        setAssets(prev => prev.filter(a => a.id !== id));
+        showToast("이미지가 영구 삭제되었습니다.", "success");
+      } else {
+        await updateAsset(id, { status: 'trash' });
+        setAssets(prev => prev.filter(a => a.id !== id));
+        showToast("휴지통으로 이동되었습니다.", "success");
+      }
+      setIsImageModalOpen(false);
     } catch (err) {
       console.error("Delete error:", err);
-      showToast("삭제에 실패했습니다.", "error");
+      showToast("삭제 명령 처리에 실패했습니다.", "error");
+    }
+  };
+
+  // 1.5️⃣ 단일 복구: 휴지통에서 '복구' 클릭 시
+  const handleRestoreAsset = async (id) => {
+    try {
+      await updateAsset(id, { status: 'active' });
+      setAssets(prev => prev.filter(a => a.id !== id));
+      showToast("이미지가 갤러리로 복구되었습니다.", "success");
+      setIsImageModalOpen(false);
+    } catch (err) {
+      console.error("Restore error:", err);
+      showToast("복구에 실패했습니다.", "error");
     }
   };
 
   // 2️⃣ 일괄 삭제: 선택 모드에서 하단 툴바 'Delete' 클릭 시
   const handleBatchDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`선택한 ${selectedIds.size}개의 항목을 서버에서 영구 삭제하시겠습니까?`)) return;
+    const isTrash = activeTab === 'trash';
+    const confirmMsg = isTrash
+      ? `선택한 ${selectedIds.size}개의 항목을 서버에서 영구 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
+      : `선택한 ${selectedIds.size}개의 항목을 휴지통으로 이동하시겠습니까?`;
+
+    if (!window.confirm(confirmMsg)) return;
 
     try {
       const idsArray = Array.from(selectedIds);
 
-      // 서버 및 스토리지 파일 삭제 병렬 실행
-      await Promise.all(idsArray.map(id => {
-        const asset = assets.find(a => String(a.id) === id);
-        const fileName = asset?.video_url || asset?.image_url || "";
-        return deleteAsset(id, fileName);
-      }));
+      if (isTrash) {
+        await Promise.all(idsArray.map(id => {
+          const asset = assets.find(a => String(a.id) === id);
+          const fileName = asset?.video_url || asset?.image_url || "";
+          return deleteAsset(id, fileName);
+        }));
+        showToast(`${idsArray.length}개 항목이 영구 삭제되었습니다.`, "success");
+      } else {
+        await Promise.all(idsArray.map(id => updateAsset(id, { status: 'trash' })));
+        showToast(`${idsArray.length}개 항목이 휴지통으로 이동되었습니다.`, "success");
+      }
 
-      // 로컬 상태에서 즉시 제거 (UI 반응성)
       setAssets(prev => prev.filter(asset => !selectedIds.has(String(asset.id))));
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+      isSelectionModeRef.current = false;
+    } catch (err) {
+      console.error("Batch delete error:", err);
+      showToast("일부 항목 처리에 실패했습니다.", "error");
+      fetchData();
+    }
+  };
 
-      // 초기화
+  // 2.5️⃣ 일괄 복구: 선택 모드에서 하단 툴바 'Restore' 클릭 시
+  const handleBatchRestore = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`선택한 ${selectedIds.size}개의 항목을 다시 갤러리로 복구하시겠습니까?`)) return;
+
+    try {
+      const idsArray = Array.from(selectedIds);
+      await Promise.all(idsArray.map(id => updateAsset(id, { status: 'active' })));
+
+      setAssets(prev => prev.filter(asset => !selectedIds.has(String(asset.id))));
       setSelectedIds(new Set());
       setIsSelectionMode(false);
       isSelectionModeRef.current = false;
 
-      showToast(`${idsArray.length}개 항목이 삭제되었습니다.`, "success");
+      showToast(`${idsArray.length}개 항목이 복구되었습니다.`, "success");
     } catch (err) {
-      console.error("Batch delete error:", err);
-      showToast("일부 항목 삭제에 실패했습니다.", "error");
-      fetchData(); // 에러 시 상태 동기화
+      console.error("Batch restore error:", err);
+      showToast("일부 항목 복구에 실패했습니다.", "error");
+      fetchData();
     }
   };
 
@@ -644,8 +694,9 @@ function Dashboard() {
     if (!userId) return;
     setLoading(true);
     try {
+      const statusParam = activeTab === 'trash' ? 'trash' : 'active';
       const [assetsData, bookmarksData, collectionsData] = await Promise.all([
-        getAssets(),
+        getAssets(statusParam),
         getBookmarks(),
         getCollections()
       ]);
@@ -661,7 +712,7 @@ function Dashboard() {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, activeTab]);
 
   // 🔃 Drag and Drop Handlers
   const handleDragStart = (idx) => {
@@ -845,8 +896,9 @@ function Dashboard() {
             <span className="text-sm font-semibold text-content">라이브러리</span>
           </div>
           <nav className="flex flex-col gap-1">
-            <NavBtn active={activeTab === 'gallery'} onClick={() => setActiveTab('gallery')} icon={<ImageIcon size={16} strokeWidth={1.5} />} label="갤러리" isSubItem={true} />
             <NavBtn active={activeTab === 'bookmarks'} onClick={() => setActiveTab('bookmarks')} icon={<Bookmark size={16} strokeWidth={1.5} />} label="북마크" isSubItem={true} />
+            <NavBtn active={activeTab === 'gallery'} onClick={() => setActiveTab('gallery')} icon={<Image size={16} strokeWidth={1.5} />} label="갤러리" isSubItem={true} />
+            <NavBtn active={activeTab === 'trash'} onClick={() => { setActiveTab('trash'); setActiveCollection(null); }} icon={<Trash2 size={16} strokeWidth={1.5} />} label="휴지통" isSubItem={true} />
             <NavBtn icon={<Tag size={16} strokeWidth={1.5} />} label="태그" badge="12" isSubItem={true} />
           </nav>
 
@@ -1094,7 +1146,7 @@ function Dashboard() {
                     className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-zinc-600 text-black dark:text-white shadow-sm' : 'text-gray-400 dark:text-zinc-500 hover:text-black dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-700/30'}`}
                     title="List"
                   >
-                    <ListIcon size={18} strokeWidth={1.5} />
+                    <List size={18} strokeWidth={1.5} />
                   </button>
                 </div>
 
@@ -1170,7 +1222,8 @@ function Dashboard() {
                 </div>
               ) : (
                 <div className="py-40 text-center bg-surface/30 border-2 border-dashed border-border rounded-[40px]">
-                  <ImageIcon size={48} className="mx-auto mb-6 text-contentMuted opacity-20" />
+                  <Image
+size={48} className="mx-auto mb-6 text-contentMuted opacity-20" />
                   <h4 className="text-[18px] font-black mb-1">라이브러리가 비어있습니다.</h4>
                   <p className="text-[13px] text-contentMuted">익스텐션을 사용하여 디자인 영감을 수집해보세요.</p>
                 </div>
@@ -1205,6 +1258,14 @@ function Dashboard() {
             </div>
             <div className="w-[1px] h-4 bg-white/10 mx-1" />
             <div className="flex gap-1">
+              {activeTab === 'trash' && (
+                <button
+                  className="h-9 px-4 flex items-center gap-2 text-[12px] font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded-full transition-colors"
+                  onClick={handleBatchRestore}
+                >
+                  <RefreshCw size={14} strokeWidth={2} /> Restore
+                </button>
+              )}
               <button
                 className="h-9 px-4 flex items-center gap-2 text-[12px] font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
                 onClick={() => setIsBatchTagModalOpen(true)}
@@ -1215,10 +1276,10 @@ function Dashboard() {
                 <Folder size={14} strokeWidth={2} /> Move
               </button>
               <button
-                className="h-9 px-4 flex items-center gap-2 text-[12px] font-medium text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-full transition-colors"
+                className="h-9 px-4 flex items-center gap-2 text-[12px] font-medium text-red-500 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-colors"
                 onClick={handleBatchDelete}
               >
-                <LogOut size={14} strokeWidth={2} /> Delete
+                <LogOut size={14} strokeWidth={2} /> {activeTab === 'trash' ? 'Hard Delete' : 'Delete'}
               </button>
             </div>
             <div className="w-[1px] h-4 bg-white/10 mx-1" />
@@ -1375,7 +1436,7 @@ function Dashboard() {
                         className="w-full h-full object-cover z-10"
                         style={{ transform: `scale(${bmForm.scale}) translate(${bmForm.offset_x}px, ${bmForm.offset_y}px)` }}
                       />
-                    ) : <Plus size={20} className="text-contentMuted opacity-20" />}
+                    ) : <ChevronRight size={16} className="text-contentMuted opacity-50" />}
                   </div>
 
                   {/* Controls */}
@@ -1690,14 +1751,37 @@ function Dashboard() {
               <div style={{ height: '1px', background: '#f0f0f0' }} />
 
               {/* Actions */}
-              <button
-                onClick={() => handleDeleteAsset(selectedAsset.id, selectedAsset.video_url || "")}
-                className="w-full h-11 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-colors"
-                style={{ background: '#fff0f0', color: '#ef4444', border: 'none', cursor: 'pointer' }}
-                onMouseOver={e => e.currentTarget.style.background = '#fee2e2'} onMouseOut={e => e.currentTarget.style.background = '#fff0f0'}
-              >
-                이미지 삭제
-              </button>
+              <div className="flex flex-col gap-2">
+                {activeTab === 'trash' ? (
+                  <>
+                    <button
+                      onClick={() => handleRestoreAsset(selectedAsset.id)}
+                      className="w-full h-11 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-colors"
+                      style={{ background: '#f0f7ff', color: '#0066ff', border: 'none', cursor: 'pointer' }}
+                      onMouseOver={e => e.currentTarget.style.background = '#e0f0ff'} onMouseOut={e => e.currentTarget.style.background = '#f0f7ff'}
+                    >
+                      <RefreshCw size={16} /> 이미지 복구
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAsset(selectedAsset.id, selectedAsset.video_url || "")}
+                      className="w-full h-11 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-colors"
+                      style={{ background: '#fff0f0', color: '#ef4444', border: 'none', cursor: 'pointer' }}
+                      onMouseOver={e => e.currentTarget.style.background = '#fee2e2'} onMouseOut={e => e.currentTarget.style.background = '#fff0f0'}
+                    >
+                      <Trash2 size={16} /> 영구 삭제
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => handleDeleteAsset(selectedAsset.id, selectedAsset.video_url || "")}
+                    className="w-full h-11 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-colors"
+                    style={{ background: '#fff0f0', color: '#ef4444', border: 'none', cursor: 'pointer' }}
+                    onMouseOver={e => e.currentTarget.style.background = '#fee2e2'} onMouseOut={e => e.currentTarget.style.background = '#fff0f0'}
+                  >
+                    휴지통으로 이동
+                  </button>
+                )}
+              </div>
 
               <div className="text-[10px] font-medium" style={{ color: '#ccc' }}>
                 수집일: {new Date(selectedAsset.created_at).toLocaleString()}

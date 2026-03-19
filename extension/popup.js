@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const WORKER_URL = "https://def-api.deference.workers.dev";
+    const WORKER_URL = import.meta.env.VITE_API_URL || "https://def-api.deference.workers.dev";
 
     // Actions
     document.getElementById('btn-capture-area').addEventListener('click', async () => {
