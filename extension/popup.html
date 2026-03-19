@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Deference Capture</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <div class="app-container">
@@ -16,20 +15,24 @@
                 <span class="logo-text">Deference</span>
             </div>
             <button id="theme-toggle" class="icon-btn" title="테마 변경">
-                <i data-lucide="moon" class="theme-icon dark-only"></i>
-                <i data-lucide="sun" class="theme-icon light-only"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="theme-icon dark-only"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="theme-icon light-only"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
             </button>
         </header>
 
         <!-- 핵심 액션: 영역/화면 캡처 -->
         <main class="actions-grid">
             <button id="btn-capture-area" class="action-btn">
-                <div class="icon-wrapper"><i data-lucide="crop"></i></div>
+                <div class="icon-wrapper">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
+                </div>
                 <div class="btn-text">영역 캡처</div>
             </button>
             
             <button id="btn-capture-visible" class="action-btn">
-                <div class="icon-wrapper"><i data-lucide="monitor"></i></div>
+                <div class="icon-wrapper">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+                </div>
                 <div class="btn-text">전체 화면</div>
             </button>
         </main>
@@ -39,7 +42,7 @@
             <div class="list-section-title">스마트 아카이빙</div>
             
             <button id="btn-batch-archive" class="list-btn">
-                <i data-lucide="layers" class="list-icon"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="list-icon"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
                 <div class="list-text">
                     <span class="title">일괄 이미지 수집</span>
                     <span class="subtitle">현재 페이지의 모든 이미지 추출</span>
@@ -47,7 +50,7 @@
             </button>
 
             <button id="btn-save-bookmark" class="list-btn">
-                <i data-lucide="bookmark" class="list-icon"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="list-icon"><path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"/></svg>
                 <div class="list-text">
                     <span class="title">북마크 추가</span>
                     <span class="subtitle">스피드 다이얼에 사이트 고정</span>
@@ -55,7 +58,7 @@
             </button>
             
             <button id="btn-save-link" class="list-btn">
-                <i data-lucide="link" class="list-icon"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="list-icon"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                 <div class="list-text">
                     <span class="title">링크 저장</span>
                     <span class="subtitle">현재 페이지 주소만 따로 보관</span>
@@ -67,7 +70,7 @@
         <footer class="footer">
             <a href="https://deference.work" target="_blank" class="footer-link">
                 <span>데이터 대시보드 열기</span>
-                <i data-lucide="external-link" size="12"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
             </a>
         </footer>
     </div>

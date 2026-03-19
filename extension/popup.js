@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Lucide icons
-    lucide.createIcons();
-
     // Theme Management
     const themeToggle = document.getElementById('theme-toggle');
     let isDark = localStorage.getItem('theme') === 'dark' || 
