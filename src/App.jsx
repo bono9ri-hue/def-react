@@ -438,10 +438,18 @@ function Dashboard() {
   const filteredAssets = assets.filter(asset => {
     const matchesSearch = asset.memo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       asset.tags?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // ✨ 휴지통 상태와 현재 탭의 일치 여부 확인 (엄격 필터링)
+    const isTrashTab = activeTab === 'trash';
+    const isAssetTrash = asset.status === 'trash';
+    if (isTrashTab !== isAssetTrash) return false;
+
     const matchesTab = activeTab === 'all' ||
+      activeTab === 'trash' ||
       (activeTab === 'gallery' && asset.image_url) ||
-      activeTab === 'home' || // Home shows everything for now
-      activeTab === 'collection'; // Collection tab also shows assets
+      activeTab === 'home' || 
+      activeTab === 'collection';
+      
     const matchesCollection = !activeCollection || asset.folder === activeCollection;
 
     return matchesSearch && matchesTab && matchesCollection;
