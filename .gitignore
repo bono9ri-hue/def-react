@@ -6,6 +6,8 @@
 
 # 빌드 결과물 및 환경 변수
 **/.env*
+**/.dev.vars
+**/.wrangler/
 **/build/
 .DS_Store
 
