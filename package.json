@@ -3,12 +3,14 @@
   "private": true,
   "workspaces": [
     "deference-web",
-    "deference-extension"
+    "deference-extension",
+    "deference-api"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w deference-web\" \"npm run dev -w deference-extension\"",
     "web": "npm run dev -w deference-web",
-    "ext": "npm run dev -w deference-extension"
+    "ext": "npm run dev -w deference-extension",
+    "api": "npm run dev -w deference-api"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

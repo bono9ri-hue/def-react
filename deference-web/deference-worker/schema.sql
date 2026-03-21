@@ -1,8 +1,0 @@
--- 사용자 전역 설정 테이블
-CREATE TABLE IF NOT EXISTS preferences (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id TEXT NOT NULL UNIQUE,
-  view_mode TEXT DEFAULT 'masonry',
-  view_size REAL DEFAULT 5,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);

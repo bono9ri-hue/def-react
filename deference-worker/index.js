@@ -1,25 +1,21 @@
 export default {
   async fetch(request, env, ctx) {
     const rawOrigin = request.headers.get("Origin");
-    
-    // Fallback to production origin if rawOrigin is missing or '*' 
-    // to avoid conflict with Access-Control-Allow-Credentials: true
-    const origin = (rawOrigin && rawOrigin !== "*") ? rawOrigin : "https://www.deference.work";
+
+    // 로컬 개발(localhost)과 운영 환경(deference.work)을 명시적으로 허용
+    const allowedOrigins = ["http://localhost:3000", "https://www.deference.work"];
+    const origin = allowedOrigins.includes(rawOrigin) ? rawOrigin : allowedOrigins[1];
 
     const corsHeaders = {
       "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-      "Access-Control-Allow-Credentials": "true",
+      "Access-Control-Allow-Credentials": "true", // 인증 정보 포함 허용
       "Access-Control-Max-Age": "86400",
     };
 
-    // 1. CORS 사전 요청 처리
     if (request.method === "OPTIONS") {
-      return new Response(null, { 
-        status: 204,
-        headers: corsHeaders 
-      });
+      return new Response(null, { status: 204, headers: corsHeaders });
     }
 
     const url = new URL(request.url);
@@ -39,13 +35,13 @@ export default {
       const pad = base64.length % 4;
       if (pad) base64 += '='.repeat(4 - pad);
       const payloadObj = JSON.parse(atob(base64));
-      
+
       const userId = payloadObj.sub; // ✨ 인증 성공!
 
       if (!userId) {
         return new Response(JSON.stringify({ error: "Invalid User ID" }), { status: 401, headers: corsHeaders });
       }
-      
+
       // ==========================================
       // [1] 파일 업로드 (R2 창고) : POST /upload
       // ==========================================
@@ -63,7 +59,7 @@ export default {
         });
 
         const publicUrl = `https://pub-d2476b64512145c0894fe40bd87e4194.r2.dev/${fileName}`;
-        
+
         return new Response(JSON.stringify({ success: true, url: publicUrl, fileName: fileName }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -75,8 +71,8 @@ export default {
       if (path === "/assets" && request.method === "GET") {
         const status = url.searchParams.get("status") || "active";
         const { results } = await env.DB.prepare(
-          "SELECT * FROM assets WHERE user_id = ? AND status = ? ORDER BY created_at DESC"
-        ).bind(userId, status).all();
+          "SELECT * FROM assets WHERE user_id = ? AND IFNULL(status, 'active') = 'active' ORDER BY created_at DESC"
+        ).bind(userId).all();
 
         return new Response(JSON.stringify(results), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -88,28 +84,28 @@ export default {
       // ==========================================
       if (path === "/assets" && request.method === "POST") {
         const body = await request.json();
-        
+
         const query = `
           INSERT INTO assets (
             user_id, item_type, image_url, video_url, page_url, 
             memo, tags, folder, palette_data, created_at, status
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'active')
         `;
-        
+
         await env.DB.prepare(query).bind(
           userId,
-          body.item_type || "image", 
-          body.image_url || "", 
-          body.video_url || "", 
-          body.page_url || "", 
-          body.memo || "", 
-          body.tags || "", 
+          body.item_type || "image",
+          body.image_url || "",
+          body.video_url || "",
+          body.page_url || "",
+          body.memo || "",
+          body.tags || "",
           body.folder || "전체",
           body.palette_data || null
         ).run();
 
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      } 
+      }
 
       // ==========================================
       // [4] 자산 정보 수정 (D1 장부) : PUT /assets
@@ -150,7 +146,11 @@ export default {
       // ==========================================
       if (path === "/collections") {
         if (request.method === "GET") {
-          const { results } = await env.DB.prepare("SELECT * FROM collections WHERE user_id = ? ORDER BY is_pinned DESC, sort_order ASC, created_at ASC").bind(userId).all();
+          const requestedStatus = url.searchParams.get("status") || "active";
+          // ✨ status 무결성을 위해 Strict Equals 적용 및 (active/trash) 명확히 분기
+          const { results } = await env.DB.prepare(
+            "SELECT * FROM collections WHERE user_id = ? AND status = ? ORDER BY is_pinned DESC, sort_order ASC, created_at ASC"
+          ).bind(userId, requestedStatus).all();
           return new Response(JSON.stringify(results), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
@@ -159,32 +159,51 @@ export default {
           // 현재 최대 sort_order 조회
           const { results: maxResults } = await env.DB.prepare("SELECT MAX(sort_order) as max_order FROM collections WHERE user_id = ?").bind(userId).all();
           const nextOrder = (maxResults[0].max_order || 0) + 1;
-          
-          await env.DB.prepare("INSERT INTO collections (name, user_id, sort_order, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)")
+
+          await env.DB.prepare("INSERT INTO collections (name, user_id, sort_order, status, created_at) VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)")
             .bind(body.name || "", userId, nextOrder).run();
           return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         if (request.method === "PUT") {
           const body = await request.json();
-          
+
           if (Array.isArray(body)) {
-            // 벌크 순서 업데이트
-            const statements = body.map(col => 
-              env.DB.prepare("UPDATE collections SET sort_order = ? WHERE id = ? AND user_id = ?")
-                .bind(col.sort_order, col.id, userId)
-            );
-            await env.DB.batch(statements);
+            // 벌크 업데이트 (순서 변경 또는 상태 일괄 변경)
+            const statements = [];
+            for (const item of body) {
+              if (item.sort_order !== undefined) {
+                statements.push(env.DB.prepare("UPDATE collections SET sort_order = ? WHERE id = ? AND user_id = ?").bind(item.sort_order, item.id, userId));
+              }
+              if (item.status !== undefined) {
+                // 컬렉션 상태 변경 및 내부 자산 연쇄 처리 (Cascading)
+                statements.push(env.DB.prepare("UPDATE collections SET status = ? WHERE id = ? AND user_id = ?").bind(item.status, item.id, userId));
+                statements.push(env.DB.prepare("UPDATE assets SET status = ? WHERE collection_id = ? AND user_id = ?").bind(item.status, item.id, userId));
+              }
+            }
+            if (statements.length > 0) await env.DB.batch(statements);
           } else {
             // 단일 업데이트 (이름 변경 또는 핀 고정 토글)
-            const { id, name, is_pinned } = body;
+            const { id, name, is_pinned, status } = body;
             if (!id) return new Response("ID 없음", { status: 400, headers: corsHeaders });
-            
+
             if (name !== undefined) {
               await env.DB.prepare("UPDATE collections SET name = ? WHERE id = ? AND user_id = ?").bind(name, id, userId).run();
             }
             if (is_pinned !== undefined) {
-              await env.DB.prepare("UPDATE collections SET is_pinned = ? WHERE id = ? AND user_id = ?").bind(is_pinned ? 1 : 0, id, userId).run();
+              // 불리언 또는 숫자로 올 수 있으므로 정규화하여 1/0으로 저장
+              const pinnedVal = (is_pinned === true || is_pinned === 1 || String(is_pinned) === "true") ? 1 : 0;
+              await env.DB.prepare("UPDATE collections SET is_pinned = ? WHERE id = ? AND user_id = ?").bind(pinnedVal, id, userId).run();
+            }
+            if (status !== undefined) {
+              // status 값 검증 (active, trash 전용)
+              const validStatus = (status === 'trash' || status === 'active') ? status : 'active';
+              // 연쇄 상태 전이 (Cascading Soft Delete)를 위해 D1 트랜잭션(Batch) 사용
+              const statements = [
+                env.DB.prepare("UPDATE collections SET status = ? WHERE id = ? AND user_id = ?").bind(validStatus, id, userId),
+                env.DB.prepare("UPDATE assets SET status = ? WHERE collection_id = ? AND user_id = ?").bind(validStatus, id, userId)
+              ];
+              await env.DB.batch(statements);
             }
           }
           return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -193,7 +212,14 @@ export default {
         if (request.method === "DELETE") {
           const id = url.searchParams.get("id");
           if (!id) return new Response("ID 없음", { status: 400, headers: corsHeaders });
-          await env.DB.prepare("DELETE FROM collections WHERE id = ? AND user_id = ?").bind(id, userId).run();
+
+          // ✨ CASCADE 처리: 소속된 에셋들과 컬렉션을 D1에서 완전히 삭제 (Hard Delete)
+          const statements = [
+            env.DB.prepare("DELETE FROM assets WHERE collection_id = ? AND user_id = ?").bind(id, userId),
+            env.DB.prepare("DELETE FROM collections WHERE id = ? AND user_id = ?").bind(id, userId)
+          ];
+          await env.DB.batch(statements);
+
           return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
         }
       }
@@ -221,7 +247,7 @@ export default {
           `;
 
           await env.DB.prepare(query).bind(
-            newId, userId, body.name, body.url, body.icon_type, body.icon_value, nextOrder, 
+            newId, userId, body.name, body.url, body.icon_type, body.icon_value, nextOrder,
             body.icon_scale || 1.0,
             body.icon_offset_x || 0,
             body.icon_offset_y || 0
@@ -243,7 +269,7 @@ export default {
               WHERE id = ? AND user_id = ?
             `;
             await env.DB.prepare(query).bind(
-              body.name, body.url, body.icon_type, body.icon_value, body.icon_scale || 1.0, 
+              body.name, body.url, body.icon_type, body.icon_value, body.icon_scale || 1.0,
               body.icon_offset_x || 0,
               body.icon_offset_y || 0,
               body.id, userId
@@ -266,15 +292,15 @@ export default {
         if (request.method === "GET") {
           const result = await env.DB.prepare("SELECT * FROM preferences WHERE user_id = ?").bind(userId).first();
           // 데이터가 없으면 기본값 응답 (masonry: 4, grid: 6)
-          return new Response(JSON.stringify(result || { view_mode: "masonry", masonry_size: 4, grid_size: 6 }), { 
-            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          return new Response(JSON.stringify(result || { view_mode: "masonry", masonry_size: 4, grid_size: 6 }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
 
         if (request.method === "PUT") {
           try {
             const body = await request.json();
-            
+
             // 파라미터 방어 로직 (Fallback 및 타입 강제화)
             const vMode = body.view_mode || body.viewMode || 'masonry';
             const mSize = body.masonry_size !== undefined ? Number(body.masonry_size) : (Number(body.masonrySize) || 4);
@@ -292,26 +318,26 @@ export default {
                 grid_size = excluded.grid_size, 
                 updated_at = CURRENT_TIMESTAMP
             `;
-            
+
             await env.DB.prepare(query).bind(
-              userId, 
-              vMode, 
-              mSize, 
+              userId,
+              vMode,
+              mSize,
               gSize
             ).run();
-            
-            return new Response(JSON.stringify({ success: true }), { 
-              headers: { ...corsHeaders, "Content-Type": "application/json" } 
+
+            return new Response(JSON.stringify({ success: true }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
           } catch (error) {
             console.error("PUT /preferences Error:", error);
-            return new Response(JSON.stringify({ 
-              error: error.message, 
+            return new Response(JSON.stringify({
+              error: error.message,
               stack: error.stack,
-              message: "사용자 설정 저장 중 서버 에러가 발생했습니다." 
-            }), { 
-              status: 500, 
-              headers: { ...corsHeaders, "Content-Type": "application/json" } 
+              message: "사용자 설정 저장 중 서버 에러가 발생했습니다."
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
             });
           }
         }
@@ -321,8 +347,8 @@ export default {
       return new Response("Deference Protected API Running 🛡️", { headers: corsHeaders });
 
     } catch (error) {
-      return new Response(JSON.stringify({ success: false, error: error.message }), { 
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      return new Response(JSON.stringify({ success: false, error: error.message }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
   },

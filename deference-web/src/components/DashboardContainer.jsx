@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { Reorder, motion, AnimatePresence } from 'framer-motion';
 import { useAuth, SignInButton, UserButton } from '@clerk/nextjs';
+import { useQueryClient } from '@tanstack/react-query';
 import * as Hangul from 'hangul-js';
 import SharedCombobox from './ui/SharedCombobox';
 import { Button } from './Button';
@@ -15,6 +16,7 @@ import NextImage from 'next/image';
 import VideoCard from './VideoCard';
 import Masonry from 'react-masonry-css';
 import { useMultiSelect } from '../hooks/useMultiSelect';
+import { useWebDragSelect } from '../hooks/useWebDragSelect';
 import {
   Home,
   Bookmark,
@@ -58,7 +60,7 @@ import ControlBar from './ControlBar';
 /* ============================================================
    GalleryCard (선택 기능 & 미니멀 체크박스 통합본)
    ============================================================ */
-const GalleryCard = React.memo(({ asset, onClick, isSelected, onToggleSelect, isEditMode, viewMode, openImageModal }) => {
+const GalleryCard = React.memo(({ asset, onClick, isSelected, isEditMode, viewMode, openImageModal }) => {
   const [isImageError, setIsImageError] = useState(false);
 
   // ✨ 이미지 URL이 변경될 경우 에러 상태 초기화 (재렌더링 대응)
@@ -94,7 +96,7 @@ const GalleryCard = React.memo(({ asset, onClick, isSelected, onToggleSelect, is
       data-id={asset.id}
     >
       <div 
-        className={`relative w-full rounded-[10px] overflow-hidden bg-gray-100 dark:bg-white/5 transition-shadow duration-300 ${isSelected ? 'ring-2 ring-blue-500/80 shadow-md' : 'border border-border/40'} ${isMasonry ? 'h-auto' : viewMode === 'grid' ? 'aspect-square' : 'aspect-video'}`}
+        className={`gallery-card-inner-box relative w-full rounded-[10px] overflow-hidden bg-gray-100 dark:bg-white/5 transition-shadow duration-300 ${isSelected ? 'ring-2 ring-blue-500/80 shadow-md' : 'border border-border/40'} ${isMasonry ? 'h-auto' : viewMode === 'grid' ? 'aspect-square' : 'aspect-video'}`}
         style={isMasonry && asset.width && asset.height ? { aspectRatio: `${asset.width} / ${asset.height}` } : {}}
       >
         {/* ✨ Skeleton Background 삭제 (깜빡임 방지) */}
@@ -102,8 +104,7 @@ const GalleryCard = React.memo(({ asset, onClick, isSelected, onToggleSelect, is
         {/* 체크박스: 오직 선택 모드일 때만 렌더링 */}
         {(isEditMode || isSelected) && (
           <div
-            onClick={(e) => { e.stopPropagation(); onToggleSelect(asset.id); }}
-            className={`absolute top-3 right-3 z-[20] w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer pointer-events-auto backdrop-blur-md
+            className={`absolute top-3 right-3 z-[20] w-5 h-5 rounded-md flex items-center justify-center transition-all pointer-events-none backdrop-blur-md
               ${isSelected 
                 ? 'bg-blue-500/90 border border-blue-500 text-white shadow-md scale-100 opacity-100' 
                 : 'bg-black/20 border border-white/50 text-transparent opacity-0 group-hover:opacity-100 hover:bg-black/30 scale-95 hover:scale-100'}`}
@@ -186,17 +187,18 @@ GalleryCard.displayName = 'GalleryCard';
 /* ============================================================
    ListRow (리스트 뷰 스타일)
    ============================================================ */
-const ListRow = React.memo(({ asset, onClick, isSelected, onToggleSelect, isEditMode, openImageModal }) => {
+const ListRow = React.memo(({ asset, onClick, isSelected, isEditMode, openImageModal }) => {
   return (
     <div
       onClick={onClick}
-      className={`group flex items-center gap-4 p-3 rounded-2xl transition-all cursor-pointer border
+      data-selectable-id={asset.id}
+      data-selectable-type="asset"
+      className={`list-row-inner-box group flex items-center gap-4 p-3 rounded-2xl transition-all cursor-pointer border
         ${isSelected ? 'bg-blue-50/50 border-blue-200' : 'hover:bg-surface border-transparent'}`}
     >
       {(isEditMode || isSelected) && (
         <div
-            onClick={(e) => { e.stopPropagation(); onToggleSelect(asset.id); }}
-            className={`w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer shrink-0 border
+            className={`w-5 h-5 rounded-md flex items-center justify-center transition-all shrink-0 border
               ${isSelected ? 'bg-blue-500 border-blue-600 text-white' : 'bg-surface border-border group-hover:border-content/20 text-transparent'}`}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.0" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -349,6 +351,7 @@ const BatchEditModal = ({ isOpen, onClose, selectedAssets, onApply, collections,
 
 export function Dashboard() {
   const { isLoaded, userId, getToken } = useAuth();
+  const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { sendMessageToBackground, getActiveTab } = useExtensionAction();
   const {
@@ -362,9 +365,11 @@ export function Dashboard() {
     getCollections,
     saveCollection,
     updateCollection,
-    deleteCollection,
     updateCollectionOrder,
-    updateAssetStatus,
+    updateStatus,
+    updateCollectionsStatus,
+    togglePinCollection,
+    deleteCollection,
     getPreferences,    // 통합 추가
     updatePreferences // 통합 추가
   } = useApi();
@@ -377,12 +382,12 @@ export function Dashboard() {
   const [assets, setAssets] = useState([]);
   const [bookmarks, setBookmarks] = useState([]);
   const [collections, setCollections] = useState([]);
+  const [trashCollections, setTrashCollections] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeContext, setActiveContext] = useState(null); 
+  const [activeContext, setActiveContext] = useState({ type: 'none', items: new Set() }); 
   // 💡 파생 변수: UI 컴포넌트 호환성 유지용 (기존 컴포넌트 수정 방지)
-  const isEditMode = activeContext !== null;
-  const selectedIds = activeContext?.type === 'asset' ? activeContext.items : new Set();
+  const isEditMode = activeContext.type !== 'none';
   const gridContainerRef = useRef(null);
   const [masonrySize, setMasonrySize] = useState(4); // 메이슨리용 이미지 크기 (기본 4)
   const [gridSize, setGridSize] = useState(6);       // 그리드용 이미지 크기 (기본 6)
@@ -403,9 +408,17 @@ export function Dashboard() {
   const [editingCollection, setEditingCollection] = useState(null);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // isEditMode 상태 폐기 (activeContext로부터 파생됨)
   const [originalCollections, setOriginalCollections] = useState([]);
+  
+  // 💡 삭제 확인 모달 통합 상태
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    title: '',
+    description: '',
+    confirmText: '삭제하기',
+    onConfirm: () => {},
+    isDanger: true
+  });
   const [isDirty, setIsDirty] = useState(false);
   const hasFetchedRef = useRef(false); // 무한 루프 방지용 Ref
 
@@ -439,8 +452,6 @@ export function Dashboard() {
   const [bmForm, setBmForm] = useState({ name: '', url: '', color: '#ffffff', scale: 1.0, offset_x: 0, offset_y: 0, isTransparent: false });
   const [draggedIdx, setDraggedIdx] = useState(null);
   const [isBatchTagModalOpen, setIsBatchTagModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [collectionToDelete, setCollectionToDelete] = useState(null);
   const masonryRef = useRef(null);
 
 
@@ -470,10 +481,11 @@ export function Dashboard() {
     try {
       console.log("Dashboard: Fetching data for user", userId);
       setLoading(true);
-      const [assetList, bookmarkList, collectionList, preferences] = await Promise.all([
+      const [assetList, bookmarkList, collectionList, trashColList, preferences] = await Promise.all([
         getAssets().catch(e => { console.error("Assets fetch error:", e); return []; }),
         getBookmarks().catch(e => { console.error("Bookmarks fetch error:", e); return []; }),
-        getCollections().catch(e => { console.error("Collections fetch error:", e); return []; }),
+        getCollections('active').catch(e => { console.error("Collections fetch error:", e); return []; }),
+        getCollections('trash').catch(e => { console.error("Trash collections fetch error:", e); return []; }),
         getPreferences().catch(e => { console.error("Preferences fetch error:", e); return null; })
       ]);
       
@@ -481,12 +493,14 @@ export function Dashboard() {
         assets: assetList?.length, 
         bookmarks: bookmarkList?.length, 
         collections: collectionList?.length,
+        trashCollections: trashColList?.length,
         preferences: !!preferences
       });
 
       setAssets(assetList || []);
       setBookmarks(bookmarkList || []);
       setCollections(collectionList || []);
+      setTrashCollections(trashColList || []);
       
       if (preferences) {
         setInitialPreferences(preferences);
@@ -499,6 +513,7 @@ export function Dashboard() {
       setAssets([]);
       setBookmarks([]);
       setCollections([]);
+      setTrashCollections([]);
       setMasonrySize(4);
       setGridSize(6);
     } finally {
@@ -534,16 +549,17 @@ export function Dashboard() {
     }
   }, [fetchData]);
 
+
   const filteredAssets = useMemo(() => {
     let result = assets;
     if (activeTab === 'trash') {
-      result = result.filter(a => a.status === 'deleted');
+      result = result.filter(a => a.status === 'trash');
     } else {
-      result = result.filter(a => a.status !== 'deleted');
+      result = result.filter(a => a.status !== 'trash');
     }
 
     if (activeTab === 'bookmarks') result = [];
-    if (activeTab === 'gallery') result = assets.filter(a => a.status !== 'deleted');
+    if (activeTab === 'gallery') result = assets.filter(a => a.status !== 'trash');
     if (activeCollection) result = result.filter(a => a.folder && a.folder.split(',').map(f => f.trim()).includes(activeCollection));
 
     if (searchQuery) {
@@ -557,10 +573,58 @@ export function Dashboard() {
     return result;
   }, [assets, activeTab, activeCollection, searchQuery]);
 
-  // 1. Multi-Selection Hooks 주입 (TDZ 해결을 위해 filteredAssets 선언 뒤로 이동)
+  // 1. Multi-Selection Hooks 주입 (Core: 순수 상태 논리 / Web: DOM 및 드래그 제어)
   const assetSelect = useMultiSelect(filteredAssets, 'asset', setActiveContext, isEditMode);
+  const assetWebSelect = useWebDragSelect(
+    filteredAssets, 
+    'asset', 
+    (items) => setActiveContext({ type: 'asset', items }),
+    assetSelect.handleSelect,
+    isEditMode
+  );
+
   const colSelect = useMultiSelect(collections, 'collection', setActiveContext, isEditMode);
+  // 컬렉션(사이드바) 등 다른 영역도 필요시 useWebDragSelect 추가 가능
+  
   const bookmarkSelect = useMultiSelect(bookmarks, 'bookmark', setActiveContext, isEditMode);
+
+  // 💡 전역 단축키 핸들러 (Cmd+A: 전체 선택, ESC: 선택 해제) - TDZ 방지를 위해 선언부 뒤로 이동
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!isEditMode) return; // 💡 편집 모드가 아닐 경우 모든 단축키 동작 차단
+
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable;
+      if (isInput) return;
+
+      if (e.key === 'a' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        const allIds = new Set(filteredAssets.map(a => String(a.id)));
+        setActiveContext({ type: 'asset', items: allIds });
+      } else if (e.key === 'Escape') {
+        setActiveContext({ type: 'none', items: new Set() });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isEditMode, filteredAssets, setActiveContext]);
+
+  // 💡 여백 클릭 시 선택 해제 핸들러
+  const handleGridAreaMouseDown = useCallback((e) => {
+    if (!isEditMode) return;
+    if (e.button !== 0) return; // 좌클릭만 허용
+
+    const isItem = e.target.closest('[data-selectable-id]');
+    const isUI = e.target.closest('button, input, a, .context-bar');
+
+    // 아이템이나 주요 UI가 아닌 순수 배경 클릭 시 초기화
+    if (!isItem && !isUI) {
+      setActiveContext({ type: 'none', items: new Set() });
+    }
+    
+    // 드래그 선택 로직 트리거
+    assetWebSelect.onMouseDown(e);
+  }, [isEditMode, assetWebSelect, setActiveContext]);
 
   // Selection Logic 및 handleGridMouseDown 코드는 useMultiSelect 훅으로 대체되었습니다.
 
@@ -582,28 +646,43 @@ export function Dashboard() {
     }
   };
 
-  const handleDeleteAsset = async (id, videoUrl) => {
+  const handleDeleteAsset = (id, videoUrl) => {
     if (activeTab === 'trash') {
-      if (!window.confirm("영구 삭제하시겠습니까? 복구할 수 없습니다.")) return;
-      try {
-        await deleteAsset(id, videoUrl);
-        setAssets(assets.filter(a => a.id !== id));
-        setIsImageModalOpen(false);
-        showToast("영구 삭제되었습니다.", "success");
-      } catch (err) { showToast("삭제에 실패했습니다.", "error"); }
+      setDeleteConfirm({
+        isOpen: true,
+        title: '영구 삭제',
+        description: '이 항목을 영구 삭제하시겠습니까? 복구할 수 없습니다.',
+        confirmText: '삭제하기',
+        onConfirm: async () => {
+          try {
+            await deleteAsset(id, videoUrl);
+            setAssets(assets.filter(a => a.id !== id));
+            setIsImageModalOpen(false);
+            showToast("영구 삭제되었습니다.", "success");
+          } catch (err) { showToast("삭제에 실패했습니다.", "error"); }
+        }
+      });
     } else {
-      try {
-        await updateAssetStatus(id, 'deleted');
-        setAssets(assets.map(a => a.id === id ? { ...a, status: 'deleted' } : a));
-        setIsImageModalOpen(false);
-        showToast("휴지통으로 이동되었습니다.", "success");
-      } catch (err) { showToast("이동에 실패했습니다.", "error"); }
+      setDeleteConfirm({
+        isOpen: true,
+        title: '휴지통 이동',
+        description: '이 항목을 휴지통으로 이동하시겠습니까?',
+        confirmText: '이동하기',
+        onConfirm: async () => {
+          try {
+            await updateStatus('asset', id, 'trash');
+            setAssets(assets.map(a => a.id === id ? { ...a, status: 'trash' } : a));
+            setIsImageModalOpen(false);
+            showToast("휴지통으로 이동되었습니다.", "success");
+          } catch (err) { showToast("이동에 실패했습니다.", "error"); }
+        }
+      });
     }
   };
 
   const handleRestoreAsset = async (id) => {
     try {
-      await updateAssetStatus(id, 'active');
+      await updateStatus('asset', id, 'active');
       setAssets(assets.map(a => a.id === id ? { ...a, status: 'active' } : a));
       setIsImageModalOpen(false);
       showToast("복구되었습니다.", "success");
@@ -619,36 +698,102 @@ export function Dashboard() {
     if (idx < filteredAssets.length - 1) openImageModal(filteredAssets[idx + 1]);
   };
 
-  // Batch Actions
-  const handleBatchDelete = async () => {
-    const count = selectedIds.size;
+  const handleBatchDelete = () => {
+    if (!activeContext || activeContext.items.size === 0) return;
+    const targetIds = Array.from(activeContext.items).map(Number);
+    const count = targetIds.length;
+    const type = activeContext.type;
+
+    if (type === 'collection') {
+       setDeleteConfirm({
+        isOpen: true,
+        title: '컬렉션 이동',
+        description: `${count}개의 컬렉션을 휴지통으로 이동하시겠습니까?`,
+        confirmText: '이동하기',
+        onConfirm: async () => {
+          try {
+            // 백엔드의 일괄 상태 업데이트 API 활용 (Cascading 연쇄 삭제 포함)
+            await updateCollectionsStatus(targetIds, 'trash');
+            
+            // 삭제된 항목 중 현재 활성화된 컬렉션이 있다면 홈으로 이동
+            if (targetIds.includes(activeCollectionId)) {
+              setActiveCollection(null);
+              setActiveCollectionId(null);
+              setActiveTab('home');
+            }
+            
+            setActiveContext({ type: 'none', items: new Set() }); // 편집 모드 종료 (UX 통일)
+            
+            // ✅ TanStack Query를 통한 즉각적인 UI 동기화
+            queryClient.invalidateQueries({ queryKey: ['collections'] });
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
+            
+            showToast("휴지통으로 이동되었습니다.", "success");
+            fetchData();
+          } catch (err) { 
+            showToast("이동에 실패했습니다.", "error"); 
+          }
+        }
+      });
+      return;
+    }
+
     if (activeTab === 'trash') {
-      if (!window.confirm(`${count}개의 항목을 영구 삭제하시겠습니까?`)) return;
-      try {
-        await Promise.all(Array.from(selectedIds).map(id => {
-          const asset = assets.find(a => String(a.id) === id);
-          return deleteAsset(id, asset?.video_url || "");
-        }));
-        setAssets(assets.filter(a => !selectedIds.has(String(a.id))));
-        setSelectedIds(new Set());
-        showToast("일괄 삭제되었습니다.", "success");
-      } catch (err) { showToast("일부 삭제에 실패했습니다.", "error"); }
+      setDeleteConfirm({
+        isOpen: true,
+        title: '영구 삭제',
+        description: `${count}개의 항목을 영구 삭제하시겠습니까? 복구할 수 없습니다.`,
+        confirmText: '삭제하기',
+        onConfirm: async () => {
+          try {
+            await Promise.all(targetIds.map(id => {
+              const asset = assets.find(a => Number(a.id) === id);
+              return deleteAsset(id, asset?.video_url || "");
+            }));
+            setAssets(assets.filter(a => !targetIds.includes(Number(a.id))));
+            setActiveContext({ type: 'none', items: new Set() });
+            showToast("일괄 삭제되었습니다.", "success");
+          } catch (err) { showToast("일반 삭제에 실패했습니다.", "error"); }
+        }
+      });
     } else {
-      if (!window.confirm(`${count}개의 항목을 휴지통으로 이동하시겠습니까?`)) return;
-      try {
-        await Promise.all(Array.from(selectedIds).map(id => updateAssetStatus(id, 'deleted')));
-        setAssets(assets.map(a => selectedIds.has(String(a.id)) ? { ...a, status: 'deleted' } : a));
-        setSelectedIds(new Set());
-        showToast("휴지통으로 이동되었습니다.", "success");
-      } catch (err) { showToast("이동에 실패했습니다.", "error"); }
+      setDeleteConfirm({
+        isOpen: true,
+        title: '휴지통 이동',
+        description: `${count}개의 항목을 휴지통으로 이동하시겠습니까?`,
+        confirmText: '이동하기',
+        onConfirm: async () => {
+          try {
+            await Promise.all(targetIds.map(id => updateStatus('asset', id, 'trash')));
+            setAssets(assets.map(a => targetIds.includes(Number(a.id)) ? { ...a, status: 'trash' } : a));
+            setActiveContext({ type: 'none', items: new Set() });
+            showToast("휴지통으로 이동되었습니다.", "success");
+          } catch (err) { showToast("이동에 실패했습니다.", "error"); }
+        }
+      });
     }
   };
 
   const handleBatchRestore = async () => {
+    if (!activeContext || activeContext.items.size === 0) return;
+    const targetIds = Array.from(activeContext.items).map(Number);
+    const type = activeContext.type;
+
     try {
-      await Promise.all(Array.from(selectedIds).map(id => updateAssetStatus(id, 'active')));
-      setAssets(assets.map(a => selectedIds.has(String(a.id)) ? { ...a, status: 'active' } : a));
-      setSelectedIds(new Set());
+      if (type === 'collection') {
+        // 사용자 요청에 따라 배열을 순회하며 개별 업데이트 호출
+        await Promise.all(targetIds.map(id => updateCollectionStatus(id, 'active')));
+      } else {
+        await Promise.all(targetIds.map(id => updateStatus('asset', id, 'active')));
+        setAssets(assets.map(a => targetIds.includes(Number(a.id)) ? { ...a, status: 'active' } : a));
+      }
+      
+      // ✅ 양방향 캐시 무효화 (기본 및 휴지통 목록 모두 동기화)
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      
+      setActiveContext({ type: 'none', items: new Set() }); 
+      fetchData(); // 💡 폴더 사이드바 즉시 갱신
       showToast("일괄 복구되었습니다.", "success");
     } catch (err) { showToast("복구에 실패했습니다.", "error"); }
   };
@@ -663,7 +808,7 @@ export function Dashboard() {
 
   const handleApplyBatchEdit = async (finalTagsObject, finalFoldersObject) => {
     try {
-      const selectedAssets = assets.filter(a => selectedIds.has(String(a.id)));
+      const selectedAssets = assets.filter(a => activeContext?.items?.has(String(a.id)) || false);
       if (selectedAssets.length === 0) return;
 
       const initialTagSet = new Set();
@@ -692,7 +837,7 @@ export function Dashboard() {
         return;
       }
 
-      await Promise.all(Array.from(selectedIds).map(id => {
+      await Promise.all(Array.from(activeContext.items).map(id => {
         const asset = assets.find(a => String(a.id) === id);
         if (!asset) return Promise.resolve();
         
@@ -708,7 +853,7 @@ export function Dashboard() {
       }));
 
       setIsBatchTagModalOpen(false);
-      setSelectedIds(new Set());
+      setActiveContext({ type: 'none', items: new Set() }); // Clear selection
       fetchData();
       showToast("일괄 업데이트가 완료되었습니다.", "success");
     } catch (err) { 
@@ -751,10 +896,17 @@ export function Dashboard() {
 
   const handleTogglePinCollection = async (col) => {
     try {
-      const is_pinned = col.is_pinned === 1 ? 0 : 1;
-      await updateCollection(col.id, col.name, is_pinned);
-      fetchData();
-    } catch (err) { showToast("핀 고정 처리에 실패했습니다.", "error"); }
+      const isPinned = col.is_pinned === 1 ? false : true; // 토글링
+      await togglePinCollection(col.id, isPinned);
+      
+      // React Query 캐시 무효화를 통해 사이드바 리스트 및 핀 아이콘 즉시 갱신
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      
+      fetchData(); // 💡 폴더 리스트 즉시 리프레시
+      showToast(isPinned ? "컬렉션이 고정되었습니다." : "고정이 해제되었습니다.", "info");
+    } catch (err) { 
+      showToast("핀 고정 처리에 실패했습니다.", "error"); 
+    }
   };
 
   const handleSaveWorkspace = async () => {
@@ -776,7 +928,7 @@ export function Dashboard() {
         setIsDirty(false);
       }
 
-      setActiveContext(null);
+      setActiveContext({ type: 'none', items: new Set() });
       showToast("워크스페이스 설정이 저장되었습니다.", "success");
     } catch (err) { 
       console.error("Save workspace failed:", err);
@@ -793,7 +945,7 @@ export function Dashboard() {
       if (initialPreferences.grid_size) setGridSize(Number(initialPreferences.grid_size));
     }
     setIsDirty(false);
-    setActiveContext(null);
+    setActiveContext({ type: 'none', items: new Set() });
   };
 
   if (!isLoaded) {
@@ -810,6 +962,62 @@ export function Dashboard() {
   const handleReorderPinned = (newPinned) => setCollections([...newPinned, ...unpinnedCols]);
   const handleReorderUnpinned = (newUnpinned) => setCollections([...pinnedCols, ...newUnpinned]);
 
+  const handleDeleteCollection = (folder) => {
+    // 💡 대상 폴더가 휴지통에 있는지 판별하는 조건을 status 필드로 엄격하게 분기 (Status-based logic)
+    if (folder.status === 'trash') {
+      setDeleteConfirm({
+        isOpen: true,
+        title: '영구 삭제',
+        description: `'${folder.name}' 컬렉션을 영구 삭제하시겠습니까? 복구할 수 없습니다.`,
+        confirmText: '영구 삭제',
+        isDanger: true,
+        onConfirm: async () => {
+          try {
+            await deleteCollection(folder.id);
+            showToast("영구 삭제되었습니다.", "success");
+            
+            if (activeCollectionId === folder.id) {
+              setActiveCollection(null);
+              setActiveCollectionId(null);
+              setActiveTab('home');
+            }
+            
+            queryClient.invalidateQueries({ queryKey: ['collections'] });
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
+            fetchData();
+          } catch (err) {
+            showToast("삭제에 실패했습니다.", "error");
+          }
+        }
+      });
+    } else {
+      setDeleteConfirm({
+        isOpen: true,
+        title: '휴지통으로 이동',
+        description: `'${folder.name}' 컬렉션을 휴지통으로 이동하시겠습니까?`,
+        confirmText: '이동하기',
+        isDanger: true,
+        onConfirm: async () => {
+          try {
+            await updateStatus('collection', folder.id, 'trash');
+            showToast("휴지통으로 이동되었습니다.", "success");
+            
+            if (activeCollectionId === folder.id) {
+              setActiveCollection(null);
+              setActiveCollectionId(null);
+              setActiveTab('home');
+            }
+            
+            queryClient.invalidateQueries({ queryKey: ['collections'] });
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
+            fetchData();
+          } catch (err) {
+            showToast("이동에 실패했습니다.", "error");
+          }
+        }
+      });
+    }
+  };
 
 
   return (
@@ -875,16 +1083,26 @@ export function Dashboard() {
                   <Reorder.Item key={col.id} value={col} dragListener={isEditMode} className="relative rounded-full select-none outline-none" data-selectable-id={col.id} data-selectable-type="collection">
                     <NavBtn
                       active={activeCollectionId === col.id}
-                      onClick={() => { 
-                        if (isEditMode) return;
+                      onClick={(e) => { 
+                        if (isEditMode) {
+                          e.preventDefault();
+                          setActiveContext(prev => {
+                            const isAsset = prev.type === 'asset';
+                            const newItems = new Set(isAsset ? [] : prev.items);
+                            const idStr = String(col.id);
+                            if (newItems.has(idStr)) newItems.delete(idStr);
+                            else newItems.add(idStr);
+                            return { type: 'collection', items: newItems };
+                          });
+                          return;
+                        }
                         setActiveCollection(col.name); 
                         setActiveCollectionId(col.id); 
                         setActiveTab('collection'); 
                       }}
                       icon={<Folder size={16} strokeWidth={1.5} />} label={col.name} isSubItem={true}
                       onEdit={() => { setEditingCollection(col); setNewCollectionName(col.name); setIsCreatingCollection(true); }}
-                                             onDelete={() => { setCollectionToDelete(col); setIsDeleteModalOpen(true); }}
-
+                      onDelete={() => handleDeleteCollection(col)}
                       isPinned={col.is_pinned === 1} onTogglePin={() => handleTogglePinCollection(col)} isEditMode={isEditMode}
                     />
                   </Reorder.Item>
@@ -895,16 +1113,26 @@ export function Dashboard() {
                   <Reorder.Item key={col.id} value={col} dragListener={isEditMode} className="relative rounded-full select-none outline-none" data-selectable-id={col.id} data-selectable-type="collection">
                     <NavBtn
                       active={activeCollectionId === col.id}
-                      onClick={() => { 
-                        if (isEditMode) return;
+                      onClick={(e) => { 
+                        if (isEditMode) {
+                          e.preventDefault();
+                          setActiveContext(prev => {
+                            const isAsset = prev.type === 'asset';
+                            const newItems = new Set(isAsset ? [] : prev.items);
+                            const idStr = String(col.id);
+                            if (newItems.has(idStr)) newItems.delete(idStr);
+                            else newItems.add(idStr);
+                            return { type: 'collection', items: newItems };
+                          });
+                          return;
+                        }
                         setActiveCollection(col.name); 
                         setActiveCollectionId(col.id); 
                         setActiveTab('collection'); 
                       }}
                       icon={<Folder size={16} strokeWidth={1.5} />} label={col.name} isSubItem={true}
                       onEdit={() => { setEditingCollection(col); setNewCollectionName(col.name); setIsCreatingCollection(true); }}
-                                             onDelete={() => { setCollectionToDelete(col); setIsDeleteModalOpen(true); }}
-
+                      onDelete={() => handleDeleteCollection(col)}
                       isPinned={col.is_pinned === 1} onTogglePin={() => handleTogglePinCollection(col)} isEditMode={isEditMode}
                     />
                   </Reorder.Item>
@@ -921,7 +1149,7 @@ export function Dashboard() {
             <NavBtn icon={<HelpCircle size={16} strokeWidth={1.5} />} label="도움말 및 지원" isSubItem={true} />
             <button onClick={() => { 
                 // 💡 워크스페이스 편집 진입 시 상태 초기화 (SSOT)
-                setActiveContext({ type: 'none', items: new Set() });
+                setActiveContext({ type: 'workspace', items: new Set() });
                 setOriginalCollections([...collections]); 
               }} className="w-fit mt-4 px-3 py-1.5 rounded-lg border border-border/50 text-[10px] uppercase tracking-tighter font-black text-contentMuted hover:border-content/30 hover:text-content transition-all opacity-40 hover:opacity-100">Edit Workspace</button>
           </nav>
@@ -930,14 +1158,14 @@ export function Dashboard() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full bg-primary relative overflow-hidden">
-        <div className="flex-1 overflow-y-auto custom-scrollbar pt-20 select-none" onMouseDown={assetSelect.onMouseDown}>
+        <div className="flex-1 overflow-y-auto custom-scrollbar pt-20 select-none" onMouseDown={handleGridAreaMouseDown}>
           <div className="px-12 max-w-[1400px] mx-auto animate-slide-up">
             {/* Bookmark Area */}
             <div className="mb-10 flex justify-center">
               <div className="w-full max-w-[600px]">
                 <div className="flex flex-wrap gap-2 justify-center">
                   {bookmarks.slice(0, 8).map((bm, idx) => (
-                    <div key={bm.id} data-selectable-id={bm.id} data-selectable-type="bookmark" draggable onDragStart={() => setTimeout(() => handleDragStart(idx), 0)} onDragOver={handleDragOver} onDrop={() => handleDrop(idx)} onClick={(e) => { if (isEditMode) return; window.open(bm.url, '_blank'); }} onContextMenu={(e) => { e.preventDefault(); openBookmarkModal(bm); }} className={`group flex flex-col items-center gap-1.5 w-[60px] cursor-pointer transition-all ${draggedIdx === idx ? 'opacity-30 scale-95' : 'opacity-100'} ${activeContext?.type === 'bookmark' && activeContext.items.has(String(bm.id)) ? 'ring-2 ring-blue-500 rounded-xl bg-blue-500/10' : ''}`}>
+                    <div key={bm.id} data-selectable-id={bm.id} data-selectable-type="bookmark" draggable onDragStart={() => setTimeout(() => handleDragStart(idx), 0)} onDragOver={handleDragOver} onDrop={() => handleDrop(idx)} onClick={(e) => { if (isEditMode) return; window.open(bm.url, '_blank'); }} onContextMenu={(e) => { e.preventDefault(); openBookmarkModal(bm); }} className={`group flex flex-col items-center gap-1.5 w-[60px] cursor-pointer transition-all ${draggedIdx === idx ? 'opacity-30 scale-95' : 'opacity-100'} ${activeContext?.type === 'bookmark' && activeContext?.items?.has(String(bm.id)) ? 'ring-2 ring-blue-500 rounded-xl bg-blue-500/10' : ''}`}>
                       <div className="w-10 h-10 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden pointer-events-none" style={{ backgroundColor: bm.icon_value === 'transparent' ? 'transparent' : (bm.icon_value || 'var(--bg-surface)') }}>
                         <img src={`https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=128`} className="w-full h-full object-cover z-10" style={{ transform: `scale(${bm.icon_scale || 1.0}) translate(${bm.icon_offset_x || 0}px, ${bm.icon_offset_y || 0}px)` }} alt={bm.name} />
                         {bm.icon_value !== 'transparent' && <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />}
@@ -984,6 +1212,58 @@ export function Dashboard() {
             />
 
             <div id="gallery-grid-area" className="pb-24 min-h-[500px] select-none">
+               {activeTab === 'trash' && trashCollections.length > 0 && !loading && (
+                 <div className="mb-12 animate-slide-up">
+                   <div className="flex items-center gap-2 mb-6 px-4">
+                     <Trash2 size={16} className="text-red-500" />
+                     <h3 className="text-[15px] font-black tracking-tight">삭제된 컬렉션</h3>
+                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-400/10 text-red-500">{trashCollections.length}</span>
+                   </div>
+                   
+                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 px-2">
+                     {trashCollections.map(col => (
+                       <div 
+                         key={col.id} 
+                         onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveContext(prev => {
+                              const isCollection = prev.type === 'collection';
+                              const newItems = new Set(isCollection ? prev.items : []);
+                              const idStr = String(col.id);
+                              if (newItems.has(idStr)) newItems.delete(idStr);
+                              else newItems.add(idStr);
+                              return { type: 'collection', items: newItems };
+                            });
+                         }}
+                         className={`group relative aspect-square bg-surface border rounded-2xl transition-all cursor-pointer flex flex-col items-center justify-center gap-2 p-4
+                           ${activeContext.type === 'collection' && activeContext.items.has(String(col.id)) 
+                             ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/20 shadow-md' 
+                             : 'border-border hover:border-red-400/30 hover:bg-red-400/5'}`}
+                         data-selectable-id={col.id}
+                         data-selectable-type="collection"
+                       >
+                         <div className={`p-3 rounded-2xl transition-all
+                           ${activeContext.type === 'collection' && activeContext.items.has(String(col.id))
+                             ? 'bg-blue-500 text-white shadow-sm'
+                             : 'bg-red-400/10 text-red-500 group-hover:bg-red-400/20'}`}>
+                           <Folder size={24} strokeWidth={1.5} />
+                         </div>
+                         <span className="text-[11px] font-bold truncate w-full text-center px-2 text-content">{col.name}</span>
+                         
+                         {/* Selection Indicator */}
+                         {activeContext.type === 'collection' && activeContext.items.has(String(col.id)) && (
+                           <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-sm scale-110 animate-pulse">
+                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                           </div>
+                         )}
+                       </div>
+                     ))}
+                   </div>
+                   
+                   <div className="h-[1px] w-full bg-border mt-12 mb-8 mx-auto opacity-50" />
+                 </div>
+               )}
+
                {loading ? (
                  <div ref={gridContainerRef}>
                    <div className="mb-8 text-center animate-pulse">
@@ -1010,11 +1290,11 @@ export function Dashboard() {
                         columnClassName="bg-clip-padding"
                       >
                         {filteredAssets.map((asset, idx) => (
-                          <div key={asset.id} data-selectable-id={asset.id} data-selectable-type="asset">
+                          <div key={asset.id} data-selectable-id={asset.id} data-selectable-type="asset" className="gallery-item-wrapper break-inside-avoid mb-4">
                             <GalleryCard 
                               asset={asset} 
                               onClick={() => { if (!isEditMode) openImageModal(asset); }} 
-                              isSelected={selectedIds.has(String(asset.id))} 
+                              isSelected={activeContext?.items?.has(String(asset.id)) || false} 
                               isEditMode={isEditMode} 
                               viewMode="masonry" 
                               openImageModal={openImageModal} 
@@ -1033,15 +1313,26 @@ export function Dashboard() {
                       >
                         {filteredAssets.map((asset, idx) => (
                            <div key={asset.id} data-selectable-id={asset.id} data-selectable-type="asset" className="gallery-item-wrapper">
-                             <GalleryCard asset={asset} onClick={() => { isEditMode ? null : openImageModal(asset); }} isSelected={selectedIds.has(String(asset.id))} isEditMode={isEditMode} viewMode="grid" openImageModal={openImageModal} priority={idx < 10} />
+                             <GalleryCard asset={asset} onClick={() => { isEditMode ? null : openImageModal(asset); }} isSelected={activeContext?.items?.has(String(asset.id)) || false} isEditMode={isEditMode} viewMode="grid" openImageModal={openImageModal} priority={idx < 10} />
                            </div>
                         ))}
                      </div>
                    )}
+           {/* 💡 전역 드래그 박스 Portal (useWebDragSelect 상태 사용) */}
+           {createPortal(
+            (() => {
+              const d = assetWebSelect.dragBox;
+              if (!d) return null;
+              return (
+                <div style={{ position: 'fixed', left: Math.min(d.x1, d.x2), top: Math.min(d.y1, d.y2), width: Math.abs(d.x2 - d.x1), height: Math.abs(d.y2 - d.y1), backgroundColor: 'rgba(0, 102, 255, 0.08)', border: '1px solid rgba(0, 102, 255, 0.5)', borderRadius: '4px', pointerEvents: 'none', zIndex: 9999 }} />
+              );
+            })(),
+             document.body
+           )}
                    {viewMode === 'list' && (
                      <div className="flex flex-col gap-2">
                        {filteredAssets.map((asset, idx) => (
-                         <ListRow key={asset.id} asset={asset} onClick={() => isEditMode ? toggleSelect(asset.id) : openImageModal(asset)} isSelected={selectedIds.has(String(asset.id))} onToggleSelect={toggleSelect} isEditMode={isEditMode} openImageModal={openImageModal} priority={idx < 10} />
+                         <ListRow key={asset.id} asset={asset} onClick={() => isEditMode ? assetSelect.handleSelect(asset.id) : openImageModal(asset)} isSelected={activeContext?.items?.has(String(asset.id)) || false} onToggleSelect={assetSelect.handleSelect} isEditMode={isEditMode} openImageModal={openImageModal} priority={idx < 10} />
                        ))}
                      </div>
                    )}
@@ -1060,13 +1351,26 @@ export function Dashboard() {
           {(assetSelect.dragBox || colSelect.dragBox || bookmarkSelect.dragBox) && createPortal(
             (() => {
               const d = assetSelect.dragBox || colSelect.dragBox || bookmarkSelect.dragBox;
-              const isAlt = d.isAlt; // Note: current hook doesn't set isAlt, but we could add it back if needed
               return (
-                <div style={{ position: 'fixed', left: Math.min(d.x1, d.x2), top: Math.min(d.y1, d.y2), width: Math.abs(d.x2 - d.x1), height: Math.abs(d.y2 - d.y1), backgroundColor: isAlt ? 'rgba(239, 68, 68, 0.07)' : 'rgba(0, 102, 255, 0.08)', border: `1px solid ${isAlt ? 'rgba(239, 68, 68, 0.4)' : 'rgba(0, 102, 255, 0.5)'}`, borderRadius: '4px', pointerEvents: 'none', zIndex: 9999 }} />
+                <div style={{ position: 'fixed', left: Math.min(d.x1, d.x2), top: Math.min(d.y1, d.y2), width: Math.abs(d.x2 - d.x1), height: Math.abs(d.y2 - d.y1), backgroundColor: 'rgba(0, 102, 255, 0.08)', border: '1px solid rgba(0, 102, 255, 0.5)', borderRadius: '4px', pointerEvents: 'none', zIndex: 9999 }} />
               );
             })(),
-            document.body
-          )}
+             document.body
+           )}
+
+          <style jsx global>{`
+            /* 💡 드래그 중인 요소(Real-time highlight) 스타일 */
+            .drag-hover .gallery-card-inner-box {
+              ring: 2.5px solid #3b82f6 !important;
+              box-shadow: 0 0 15px rgba(59, 130, 246, 0.4) !important;
+              outline: 2px solid #3b82f6 !important;
+              outline-offset: -2px;
+            }
+            .drag-hover.list-row-inner-box {
+              background-color: rgba(59, 130, 246, 0.1) !important;
+              border-color: rgba(59, 130, 246, 0.4) !important;
+            }
+          `}</style>
 
           {/* Dynamic Context Bar (Integrated & Advanced Layout) */}
           <AnimatePresence>
@@ -1103,12 +1407,34 @@ export function Dashboard() {
                             <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded bg-white/20 text-[11px] font-black">{activeContext.items.size}</span>
                             <span>Selected</span>
                           </div>
+
+                          {/* 💡 전체 선택 / 해제 토글 버튼 */}
+                          <button 
+                            onClick={() => {
+                              if (activeContext.items.size === filteredAssets.length) {
+                                setActiveContext({ type: 'none', items: new Set() });
+                              } else {
+                                setActiveContext({ type: 'asset', items: new Set(filteredAssets.map(a => String(a.id))) });
+                              }
+                            }}
+                            className="text-[11px] font-bold text-blue-400 hover:text-blue-300 px-2 py-1 rounded-md hover:bg-white/5 transition-all"
+                          >
+                            {activeContext.items.size === filteredAssets.length ? 'Deselect All' : 'Select All'}
+                          </button>
                           <button 
                             className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all" 
                             onClick={() => setIsBatchTagModalOpen(true)}
                           >
                             <Edit2 size={14} strokeWidth={2.5} /> Batch Edit
                           </button>
+                          {activeTab === 'trash' && (
+                            <button 
+                              className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded-full transition-all"
+                              onClick={handleBatchRestore}
+                            >
+                              <RefreshCw size={14} strokeWidth={2.5} /> Restore
+                            </button>
+                          )}
                           <button 
                             className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-red-500 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-all" 
                             onClick={handleBatchDelete}
@@ -1127,12 +1453,26 @@ export function Dashboard() {
                             <button className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">
                               <Edit2 size={14} strokeWidth={2.5} /> Rename
                             </button>
-                            <button className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">
-                              <Pin size={14} strokeWidth={2.5} /> Pin
-                            </button>
-                            <button className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-red-500 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-all">
-                              <Trash2 size={14} strokeWidth={2.5} /> Delete
-                            </button>
+                            {activeTab === 'trash' ? (
+                              <button 
+                                className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded-full transition-all"
+                                onClick={handleBatchRestore}
+                              >
+                                <RefreshCw size={14} strokeWidth={2.5} /> Restore
+                              </button>
+                            ) : (
+                              <>
+                                <button className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">
+                                  <Pin size={14} strokeWidth={2.5} /> Pin
+                                </button>
+                                <button 
+                                  className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-red-500 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-all" 
+                                  onClick={handleBatchDelete}
+                                >
+                                  <Trash2 size={14} strokeWidth={2.5} /> Delete
+                                </button>
+                              </>
+                            )}
                         </div>
                       )}
                     </motion.div>
@@ -1191,38 +1531,25 @@ export function Dashboard() {
         )}
       </AnimatePresence>
 
-      {/* Delete Collection Confirmation Modal */}
       <AnimatePresence>
-        {isDeleteModalOpen && collectionToDelete && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] flex items-center justify-center p-6 bg-black/50 backdrop-blur-md">
+        {deleteConfirm.isOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[700] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white border border-gray-200 w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl p-8" style={{ color: '#111' }}>
               <div className="flex flex-col items-center text-center">
-                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-6">
-                  <AlertTriangle size={32} className="text-red-500" />
+                <h2 className="text-[20px] font-bold mb-2">{deleteConfirm.title || '삭제 확인'}</h2>
+                <div className="text-[14px] text-gray-500 mb-8 leading-relaxed whitespace-pre-line">
+                  {deleteConfirm.description}
                 </div>
-                <h2 className="text-[20px] font-bold mb-2">컬렉션 삭제</h2>
-                <p className="text-[14px] text-gray-500 mb-8 leading-relaxed">
-                  '<span className="font-bold text-gray-900">{collectionToDelete.name}</span>' 컬렉션을 삭제하시겠습니까?<br/>
-                  컬렉션 내 에셋들은 '전체 미디어'에 유지됩니다.
-                </p>
                 <div className="flex gap-3 w-full">
-                  <button onClick={() => { setIsDeleteModalOpen(false); setCollectionToDelete(null); }} className="flex-1 h-12 rounded-2xl bg-gray-100 hover:bg-gray-200 text-[14px] font-bold text-gray-600 transition-colors">취소</button>
+                  <button onClick={() => setDeleteConfirm(prev => ({ ...prev, isOpen: false }))} className="flex-1 h-12 rounded-2xl bg-gray-100 hover:bg-gray-200 text-[14px] font-bold text-gray-600 transition-colors">취소</button>
                   <button 
-                    onClick={() => {
-                      deleteCollection(collectionToDelete.id).then(() => {
-                        showToast("삭제되었습니다.", "success");
-                        if (activeCollection === collectionToDelete.name) {
-                          setActiveCollection(null);
-                          setActiveTab('home');
-                        }
-                        fetchData();
-                        setIsDeleteModalOpen(false);
-                        setCollectionToDelete(null);
-                      }).catch(() => showToast("삭제에 실패했습니다.", "error"));
+                    onClick={async () => {
+                      await deleteConfirm.onConfirm();
+                      setDeleteConfirm(prev => ({ ...prev, isOpen: false }));
                     }}
-                    className="flex-1 h-12 rounded-2xl bg-red-500 hover:bg-red-600 text-[14px] font-bold text-white transition-all shadow-lg shadow-red-500/20 active:scale-95"
+                    className={`flex-1 h-12 rounded-2xl ${deleteConfirm.isDanger ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-[14px] font-bold text-white transition-all shadow-lg active:scale-95`}
                   >
-                    삭제하기
+                    {deleteConfirm.confirmText || '확인'}
                   </button>
                 </div>
               </div>
@@ -1426,7 +1753,7 @@ export function Dashboard() {
       <BatchEditModal 
         isOpen={isBatchTagModalOpen} 
         onClose={() => setIsBatchTagModalOpen(false)} 
-        selectedAssets={assets.filter(a => selectedIds.has(String(a.id)))}
+        selectedAssets={assets.filter(a => activeContext?.items?.has(String(a.id)))}
         onApply={handleApplyBatchEdit}
         collections={collections}
         allTags={allTags}

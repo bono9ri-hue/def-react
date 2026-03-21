@@ -99,6 +99,18 @@ export function useApi() {
     });
   }, [fetchWithAuth]);
 
+  const updateStatus = useCallback(async (type, id, status) => {
+    const endpoint = type === 'asset' ? '/assets' : '/collections';
+    return fetchWithAuth(endpoint, {
+      method: "PUT",
+      body: JSON.stringify({ id: Number(id), status })
+    });
+  }, [fetchWithAuth]);
+
+  const updateAssetStatus = useCallback(async (id, status) => {
+    return updateStatus('asset', id, status);
+  }, [updateStatus]);
+
   const getAssets = useCallback(async (status = 'active') => {
     return fetchWithAuth(`/assets?status=${status}`);
   }, [fetchWithAuth]);
@@ -114,8 +126,8 @@ export function useApi() {
     return fetchWithAuth('/bookmarks');
   }, [fetchWithAuth]);
 
-  const getCollections = useCallback(async () => {
-    return fetchWithAuth('/collections');
+  const getCollections = useCallback(async (status = 'active') => {
+    return fetchWithAuth(`/collections?status=${status}`);
   }, [fetchWithAuth]);
 
   const saveCollection = useCallback(async (name) => {
@@ -137,6 +149,10 @@ export function useApi() {
       method: "DELETE"
     });
   }, [fetchWithAuth]);
+  
+  const updateCollectionStatus = useCallback(async (id, status) => {
+    return updateStatus('collection', id, status);
+  }, [updateStatus]);
 
   const uploadFile = useCallback(async (file) => {
     const formData = new FormData();
@@ -165,6 +181,14 @@ export function useApi() {
     return fetchWithAuth('/collections', {
       method: "PUT",
       body: JSON.stringify(collectionsArray)
+    });
+  }, [fetchWithAuth]);
+
+  const updateCollectionsStatus = useCallback(async (ids, status) => {
+    const payload = ids.map(id => ({ id: Number(id), status }));
+    return fetchWithAuth('/collections', {
+      method: "PUT",
+      body: JSON.stringify(payload)
     });
   }, [fetchWithAuth]);
 
@@ -211,7 +235,12 @@ export function useApi() {
     deleteCollection,
     uploadFile,
     getPreferences,
-    updatePreferences
+    updatePreferences,
+    updatePreferences,
+    updateStatus,
+    updateCollectionsStatus,
+    updateAssetStatus,
+    updateCollectionStatus
   }), [
     fetchWithAuth,
     saveAsset,
@@ -231,6 +260,10 @@ export function useApi() {
     deleteCollection,
     uploadFile,
     getPreferences,
-    updatePreferences
+    updatePreferences,
+    updateStatus,
+    updateCollectionsStatus,
+    updateAssetStatus,
+    updateCollectionStatus
   ]);
 }

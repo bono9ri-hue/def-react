@@ -10,11 +10,10 @@ import { useState, useCallback, useRef } from 'react';
  */
 export const useMultiSelect = (items, type, setActiveContext, isEditMode) => {
   const [anchorIndex, setAnchorIndex] = useState(null);
-  const [dragBox, setDragBox] = useState(null);
-  const cachedRectsRef = useRef([]); // 드래그 성능 최적화를 위한 좌표 캐싱
 
   /**
    * handleSelect: 클릭 이벤트 또는 범위 선택 시 다중 선택 로직 수행
+   * (Pure Logic: React Native 등 타 플랫폼에서도 이벤트 객체의 modifier key 정보만 넘겨주면 동작 가능)
    */
   const handleSelect = useCallback((e, item, index) => {
     setActiveContext(prev => {
@@ -44,85 +43,8 @@ export const useMultiSelect = (items, type, setActiveContext, isEditMode) => {
     });
   }, [items, type, setActiveContext, anchorIndex]);
 
-  /**
-   * onMouseDown: 통합 마우스 핸들러 (개별 클릭 및 드래그 시작)
-   */
-  const onMouseDown = useCallback((e) => {
-    if (!isEditMode) return;
-    if (e.button !== 0) return;
-
-    // 1. 개별 아이템 클릭 체크 (버튼 등 상호작용 요소 제외)
-    const itemEl = e.target.closest('[data-selectable-id]');
-    if (itemEl && !e.target.closest('button, input, a')) {
-      const id = itemEl.getAttribute('data-selectable-id');
-      const item = items.find(i => String(i.id) === id);
-      const index = items.findIndex(i => String(i.id) === id);
-      if (item) {
-        handleSelect(e, item, index);
-        return;
-      }
-    }
-
-    // 2. 드래그 시작 (빈 공간 또는 아이템 외곽)
-    if (e.target.closest('button, input, a')) return;
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-
-    // 선택 가능한 요소들 좌표 캐싱
-    const selectableNodes = document.querySelectorAll(`[data-selectable-type="${type}"]`);
-    cachedRectsRef.current = Array.from(selectableNodes).map(node => ({
-      id: node.getAttribute('data-selectable-id'),
-      rect: node.getBoundingClientRect()
-    }));
-
-    const handleMouseMove = (mmE) => {
-      const currentDragBox = { x1: startX, y1: startY, x2: mmE.clientX, y2: mmE.clientY };
-      setDragBox(currentDragBox);
-
-      const xmin = Math.min(startX, mmE.clientX);
-      const xmax = Math.max(startX, mmE.clientX);
-      const ymin = Math.min(startY, mmE.clientY);
-      const ymax = Math.max(startY, mmE.clientY);
-
-      setActiveContext(prev => {
-        const isAdditive = mmE.shiftKey || mmE.metaKey || mmE.ctrlKey;
-        const isSubtractive = mmE.altKey;
-        const baseItems = (isAdditive || isSubtractive) ? new Set(prev?.items) : new Set();
-        
-        const newInBox = new Set();
-        cachedRectsRef.current.forEach(({ id, rect }) => {
-          const midX = rect.left + rect.width / 2;
-          const midY = rect.top + rect.height / 2;
-          if (midX >= xmin && midX <= xmax && midY >= ymin && midY <= ymax) {
-            newInBox.add(id);
-          }
-        });
-
-        if (isSubtractive) {
-          newInBox.forEach(id => baseItems.delete(id));
-        } else {
-          newInBox.forEach(id => baseItems.add(id));
-        }
-
-        return { type, items: baseItems };
-      });
-    };
-
-    const handleMouseUp = () => {
-      setDragBox(null);
-      cachedRectsRef.current = [];
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  }, [items, type, setActiveContext, isEditMode, handleSelect]);
-
   return {
-    onMouseDown,
-    dragBox,
+    handleSelect,
     anchorIndex,
     setAnchorIndex
   };
