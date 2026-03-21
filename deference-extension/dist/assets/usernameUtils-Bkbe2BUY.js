@@ -1,0 +1,1 @@
+import{l as s}from"./localizationKeys-L95TEc06.js";const r="form_username_invalid_length",a="form_username_needs_non_number_char",u=(m,n)=>{const{t,usernameSettings:_}=n,e=m[0];return n?(e==null?void 0:e.code)===r?t(s(`unstable__errors.${r}`,{min_length:_.min_length,max_length:_.max_length})):(e==null?void 0:e.code)===a?t(s(`unstable__errors.${a}`)):e:e};export{u as c};

@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Deference Collector",
+  "version": "1.0.0",
+  "description": "Deference 미디어 수집 도구",
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "scripting",
+    "storage",
+    "cookies"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "https://deference.work/*",
+    "https://www.deference.work/*",
+    "https://def-api.deference.workers.dev/*",
+    "http://localhost:3000/*"
+  ],
+  "background": {
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "index.html"
+  },
+  "content_scripts": [
+    {
+      "js": [
+        "assets/content.js-DM4mLZNY.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "resources": [
+        "assets/content.js-DM4mLZNY.js"
+      ],
+      "use_dynamic_url": false
+    }
+  ]
+}

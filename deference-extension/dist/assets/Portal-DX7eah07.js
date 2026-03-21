@@ -1,0 +1,1 @@
+import{R as r,l as o}from"./index.html-BoVIvYkW.js";const n=t=>{const e=r.useRef(document.createElement("div"));return r.useEffect(()=>(document.body.appendChild(e.current),()=>{document.body.removeChild(e.current)}),[]),o.createPortal(t.children,e.current)};export{n as P};
