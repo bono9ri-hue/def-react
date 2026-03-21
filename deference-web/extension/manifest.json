@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Deference Collector",
+  "version": "1.0",
+  "description": "Collect media assets with one click",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ],
+  "action": {
+    "default_title": "Collect Media"
+  }
+}
