@@ -1,0 +1,16 @@
+{
+  "name": "deference-monorepo",
+  "private": true,
+  "workspaces": [
+    "deference-web",
+    "deference-extension"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w deference-web\" \"npm run dev -w deference-extension\"",
+    "web": "npm run dev -w deference-web",
+    "ext": "npm run dev -w deference-extension"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
