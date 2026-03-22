@@ -103,7 +103,7 @@ export function useApi() {
     const endpoint = type === 'asset' ? '/assets' : '/collections';
     return fetchWithAuth(endpoint, {
       method: "PUT",
-      body: JSON.stringify({ id: Number(id), status })
+      body: JSON.stringify({ id, status })
     });
   }, [fetchWithAuth]);
 
@@ -111,9 +111,7 @@ export function useApi() {
     return updateStatus('asset', id, status);
   }, [updateStatus]);
 
-  const getAssets = useCallback(async (status = 'active') => {
-    return fetchWithAuth(`/assets?status=${status}`);
-  }, [fetchWithAuth]);
+  const getAssets = useCallback((status = 'active') => fetchWithAuth('/assets?status=' + status), [fetchWithAuth]);
 
   const saveBookmark = useCallback(async (bookmarkData) => {
     return fetchWithAuth('/bookmarks', {
@@ -126,9 +124,7 @@ export function useApi() {
     return fetchWithAuth('/bookmarks');
   }, [fetchWithAuth]);
 
-  const getCollections = useCallback(async (status = 'active') => {
-    return fetchWithAuth(`/collections?status=${status}`);
-  }, [fetchWithAuth]);
+  const getCollections = useCallback((status = 'active') => fetchWithAuth('/collections?status=' + status), [fetchWithAuth]);
 
   const saveCollection = useCallback(async (name) => {
     return fetchWithAuth('/collections', {

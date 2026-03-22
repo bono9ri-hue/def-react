@@ -3,11 +3,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Reorder, motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'next/navigation';
 import { useAuth, SignInButton, UserButton } from '@clerk/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Hangul from 'hangul-js';
 import SharedCombobox from './ui/SharedCombobox';
 import { Button } from './Button';
+import { FloatingBar } from './FloatingBar';
 import { Card } from './Card';
 import { ToastProvider, useToast } from './Toast';
 import { useExtensionAction } from '../hooks/useExtensionAction';
@@ -15,7 +17,7 @@ import { useApi } from '../hooks/useApi';
 import NextImage from 'next/image';
 import VideoCard from './VideoCard';
 import Masonry from 'react-masonry-css';
-import { useMultiSelect } from '../hooks/useMultiSelect';
+import { useSelectionStore } from '../store/useSelectionStore';
 import { useWebDragSelect } from '../hooks/useWebDragSelect';
 import {
   Home,
@@ -191,6 +193,7 @@ const ListRow = React.memo(({ asset, onClick, isSelected, isEditMode, openImageM
   return (
     <div
       onClick={onClick}
+      onMouseDown={(e) => e.stopPropagation()}
       data-selectable-id={asset.id}
       data-selectable-type="asset"
       className={`list-row-inner-box group flex items-center gap-4 p-3 rounded-2xl transition-all cursor-pointer border
@@ -351,6 +354,7 @@ const BatchEditModal = ({ isOpen, onClose, selectedAssets, onApply, collections,
 
 export function Dashboard() {
   const { isLoaded, userId, getToken } = useAuth();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { sendMessageToBackground, getActiveTab } = useExtensionAction();
@@ -375,6 +379,7 @@ export function Dashboard() {
   } = useApi();
 
   const [activeTab, setActiveTab] = useState('home');
+  const isTrashView = searchParams.get('status') === 'trash' || activeTab === 'trash';
   const [activeCollection, setActiveCollection] = useState(null);
   const [activeCollectionId, setActiveCollectionId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -385,9 +390,10 @@ export function Dashboard() {
   const [trashCollections, setTrashCollections] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeContext, setActiveContext] = useState({ type: 'none', items: new Set() }); 
-  // 💡 파생 변수: UI 컴포넌트 호환성 유지용 (기존 컴포넌트 수정 방지)
-  const isEditMode = activeContext.type !== 'none';
+  const clearSelection = useSelectionStore(state => state.clearSelection);
+  const selectedItems = useSelectionStore(state => state.selectedItems);
+  const isEditMode = useSelectionStore(state => state.isEditMode);
+  const setEditMode = useSelectionStore(state => state.setEditMode);
   const gridContainerRef = useRef(null);
   const [masonrySize, setMasonrySize] = useState(4); // 메이슨리용 이미지 크기 (기본 4)
   const [gridSize, setGridSize] = useState(6);       // 그리드용 이미지 크기 (기본 6)
@@ -420,7 +426,6 @@ export function Dashboard() {
     isDanger: true
   });
   const [isDirty, setIsDirty] = useState(false);
-  const hasFetchedRef = useRef(false); // 무한 루프 방지용 Ref
 
   // 비로그인 유저 강제 리다이렉트 (인증 아키텍처 구축)
   useEffect(() => {
@@ -479,10 +484,10 @@ export function Dashboard() {
     }
 
     try {
-      console.log("Dashboard: Fetching data for user", userId);
+      console.log("Dashboard: Fetching data for user", userId, "status:", isTrashView ? 'trash' : 'active');
       setLoading(true);
       const [assetList, bookmarkList, collectionList, trashColList, preferences] = await Promise.all([
-        getAssets().catch(e => { console.error("Assets fetch error:", e); return []; }),
+        getAssets(isTrashView ? 'trash' : 'active').catch(e => { console.error("Assets fetch error:", e); return []; }),
         getBookmarks().catch(e => { console.error("Bookmarks fetch error:", e); return []; }),
         getCollections('active').catch(e => { console.error("Collections fetch error:", e); return []; }),
         getCollections('trash').catch(e => { console.error("Trash collections fetch error:", e); return []; }),
@@ -520,23 +525,14 @@ export function Dashboard() {
       console.log("Dashboard: Fetch completed, setting loading to false");
       setLoading(false);
     }
-  }, [isLoaded, userId]); 
+  }, [isLoaded, userId, isTrashView, activeTab]); 
   // API 함수들을 의존성에서 제거하여 무한 루프 원천 차단
 
-  useEffect(() => { 
-    console.log("Auth State Check:", { isLoaded, userId: !!userId, hasFetched: hasFetchedRef.current });
-    
-    if (isLoaded) {
-      if (!userId) {
-        // 비로그인 상태일 경우 즉시 로딩 해제
-        setLoading(false);
-      } else if (!hasFetchedRef.current) {
-        console.log("🚀 Dashboard: Starting initial data fetch for authenticated user...");
-        hasFetchedRef.current = true;
-        fetchData(); 
-      }
+  useEffect(() => {
+    if (isLoaded && userId) {
+      fetchData();
     }
-  }, [isLoaded, userId, fetchData]);
+  }, [isLoaded, userId, isTrashView, fetchData]);
 
   // chrome.storage logic replaced with safe check or stubbed for web
   useEffect(() => {
@@ -551,17 +547,32 @@ export function Dashboard() {
 
 
   const filteredAssets = useMemo(() => {
-    let result = assets;
-    if (activeTab === 'trash') {
-      result = result.filter(a => a.status === 'trash');
-    } else {
-      result = result.filter(a => a.status !== 'trash');
+    // 1. 휴지통 뷰일 경우 폴더/탭 필터링 전면 우회
+    if (isTrashView) {
+      // 검색어(searchQuery)가 있을 때만 휴지통 내 검색 허용, 그 외엔 원본 통과
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return assets.filter(a => 
+          (a.memo && a.memo.toLowerCase().includes(q)) || 
+          (a.tags && a.tags.toLowerCase().includes(q)) ||
+          (a.page_title && a.page_title.toLowerCase().includes(q))
+        );
+      }
+      return assets;
     }
 
+    // 2. 일반 뷰 필터링 로직
+    let result = assets.filter(a => a.status !== 'trash');
+    
     if (activeTab === 'bookmarks') result = [];
-    if (activeTab === 'gallery') result = assets.filter(a => a.status !== 'trash');
-    if (activeCollection) result = result.filter(a => a.folder && a.folder.split(',').map(f => f.trim()).includes(activeCollection));
+    if (activeTab === 'gallery') {
+      // 이미 위에서 status !== 'trash'로 걸러짐
+    }
+    if (activeCollection) {
+      result = result.filter(a => a.folder && a.folder.split(',').map(f => f.trim()).includes(activeCollection));
+    }
 
+    // 3. 일반 뷰 검색 필터링
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(a => 
@@ -571,22 +582,20 @@ export function Dashboard() {
       );
     }
     return result;
-  }, [assets, activeTab, activeCollection, searchQuery]);
+  }, [assets, activeTab, activeCollection, searchQuery, isTrashView]);
 
-  // 1. Multi-Selection Hooks 주입 (Core: 순수 상태 논리 / Web: DOM 및 드래그 제어)
-  const assetSelect = useMultiSelect(filteredAssets, 'asset', setActiveContext, isEditMode);
-  const assetWebSelect = useWebDragSelect(
-    filteredAssets, 
-    'asset', 
-    (items) => setActiveContext({ type: 'asset', items }),
-    assetSelect.handleSelect,
+  // 💡 Marquee Selection (드래그 선택)
+  const { handleMouseDown, isDragging, selectionBox } = useWebDragSelect(
+    activeTab === 'trash' ? [...trashCollections, ...assets] : filteredAssets,
+    'asset', // TODO: Trash에서는 collection도 지원하도록 확장 가능
+    isTrashView ? 'trash' : 'gallery',
     isEditMode
   );
 
-  const colSelect = useMultiSelect(collections, 'collection', setActiveContext, isEditMode);
-  // 컬렉션(사이드바) 등 다른 영역도 필요시 useWebDragSelect 추가 가능
-  
-  const bookmarkSelect = useMultiSelect(bookmarks, 'bookmark', setActiveContext, isEditMode);
+  // 💡 View Change Reset
+  useEffect(() => {
+    clearSelection();
+  }, [isTrashView, activeCollectionId, clearSelection]);
 
   // 💡 전역 단축키 핸들러 (Cmd+A: 전체 선택, ESC: 선택 해제) - TDZ 방지를 위해 선언부 뒤로 이동
   useEffect(() => {
@@ -598,18 +607,18 @@ export function Dashboard() {
 
       if (e.key === 'a' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        const allIds = new Set(filteredAssets.map(a => String(a.id)));
-        setActiveContext({ type: 'asset', items: allIds });
+        const allItems = filteredAssets.map(a => ({ id: String(a.id), type: 'asset', context: isTrashView ? 'trash' : 'gallery' }));
+        useSelectionStore.getState().setMarqueeSelection(allItems);
       } else if (e.key === 'Escape') {
-        setActiveContext({ type: 'none', items: new Set() });
+        clearSelection();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditMode, filteredAssets, setActiveContext]);
+  }, [isEditMode, filteredAssets, isTrashView, clearSelection]);
 
-  // 💡 여백 클릭 시 선택 해제 핸들러
+  // 💡 여백 클릭 시 선택 해제 핸들러 - macOS 표준 (수식어 없을 때만 해제)
   const handleGridAreaMouseDown = useCallback((e) => {
     if (!isEditMode) return;
     if (e.button !== 0) return; // 좌클릭만 허용
@@ -617,23 +626,44 @@ export function Dashboard() {
     const isItem = e.target.closest('[data-selectable-id]');
     const isUI = e.target.closest('button, input, a, .context-bar');
 
-    // 아이템이나 주요 UI가 아닌 순수 배경 클릭 시 초기화
-    if (!isItem && !isUI) {
-      setActiveContext({ type: 'none', items: new Set() });
+    // macOS Standard: Cmd/Shift 수식어 없이 순수 배경 클릭 시에만 초기화
+    if (!isItem && !isUI && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+      clearSelection();
     }
-    
-    // 드래그 선택 로직 트리거
-    assetWebSelect.onMouseDown(e);
-  }, [isEditMode, assetWebSelect, setActiveContext]);
-
-  // Selection Logic 및 handleGridMouseDown 코드는 useMultiSelect 훅으로 대체되었습니다.
-
+  }, [isEditMode, clearSelection]);
+  
   // Image Modal
-  const openImageModal = (asset) => {
+  const openImageModal = useCallback((asset) => {
     setSelectedAsset(asset);
     setAssetForm({ memo: asset.memo || '', tags: asset.tags || '', folder: asset.folder || '전체' });
     setIsImageModalOpen(true);
-  };
+  }, []);
+
+  // 💡 Figma-style Item Click 핸들러 (Normal / Meta-Ctrl / Shift) - macOS 표준 알고리즘
+  const handleItemClick = useCallback((e, item, index, currentList, type, context) => {
+    e.preventDefault();
+    e.stopPropagation(); // 드래그 이벤트로의 버블링 철저히 차단
+
+    if (!isEditMode) {
+      if (type === 'asset') openImageModal(item);
+      return;
+    }
+
+    const { selectSingle, toggleSingle, selectRange } = useSelectionStore.getState();
+
+    if (e.shiftKey) {
+      // Shift 클릭: 범위 선택 알고리즘 호출
+      selectRange(item, currentList, type, context);
+    } else if (e.metaKey || e.ctrlKey) {
+      // Cmd/Ctrl 클릭: 개별 토글
+      toggleSingle(item, context);
+    } else {
+      // 일반 클릭: 단일 선택 및 앵커 갱신
+      selectSingle(item, context);
+    }
+  }, [isEditMode, openImageModal]);
+
+
 
   const handleUpdateAsset = async () => {
     if (!selectedAsset) return;
@@ -698,104 +728,127 @@ export function Dashboard() {
     if (idx < filteredAssets.length - 1) openImageModal(filteredAssets[idx + 1]);
   };
 
-  const handleBatchDelete = () => {
-    if (!activeContext || activeContext.items.size === 0) return;
-    const targetIds = Array.from(activeContext.items).map(Number);
-    const count = targetIds.length;
-    const type = activeContext.type;
+  // 💡 Integrated Polymorphic Actions (Zustand 대응)
+  const handleIntegratedDelete = async () => {
+    if (selectedItems.length === 0) return;
+    const count = selectedItems.length;
+    const isTrashAction = selectedItems.some(i => i.context === 'trash');
 
-    if (type === 'collection') {
-       setDeleteConfirm({
-        isOpen: true,
-        title: '컬렉션 이동',
-        description: `${count}개의 컬렉션을 휴지통으로 이동하시겠습니까?`,
-        confirmText: '이동하기',
-        onConfirm: async () => {
-          try {
-            // 백엔드의 일괄 상태 업데이트 API 활용 (Cascading 연쇄 삭제 포함)
-            await updateCollectionsStatus(targetIds, 'trash');
-            
-            // 삭제된 항목 중 현재 활성화된 컬렉션이 있다면 홈으로 이동
-            if (targetIds.includes(activeCollectionId)) {
-              setActiveCollection(null);
-              setActiveCollectionId(null);
-              setActiveTab('home');
+    const config = isTrashAction ? {
+      title: '영구 삭제',
+      description: `${count}개의 항목을 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 D1 데이터베이스에서 즉시 소멸됩니다.`,
+      confirmText: '영구 삭제',
+      isDanger: true
+    } : {
+      title: '휴지통 이동',
+      description: `${count}개의 항목을 휴지통으로 이동하시겠습니까?`,
+      confirmText: '이동하기',
+      isDanger: true
+    };
+
+    setDeleteConfirm({
+      isOpen: true,
+      ...config,
+      onConfirm: async () => {
+        try {
+          // Type별 분배 처리
+          const assetsToDel = selectedItems.filter(i => i.type === 'asset');
+          const colsToDel = selectedItems.filter(i => i.type === 'collection');
+          const bookmarksToDel = selectedItems.filter(i => i.type === 'bookmark');
+
+          if (isTrashAction) {
+            if (assetsToDel.length > 0) {
+              await Promise.all(assetsToDel.map(i => {
+                const asset = assets.find(a => String(a.id) === String(i.id));
+                return deleteAsset(i.id, asset?.video_url || "");
+              }));
+              setAssets(prev => prev.filter(a => !assetsToDel.some(i => String(i.id) === String(a.id))));
             }
-            
-            setActiveContext({ type: 'none', items: new Set() }); // 편집 모드 종료 (UX 통일)
-            
-            // ✅ TanStack Query를 통한 즉각적인 UI 동기화
-            queryClient.invalidateQueries({ queryKey: ['collections'] });
-            queryClient.invalidateQueries({ queryKey: ['assets'] });
-            
-            showToast("휴지통으로 이동되었습니다.", "success");
-            fetchData();
-          } catch (err) { 
-            showToast("이동에 실패했습니다.", "error"); 
+            if (colsToDel.length > 0) await Promise.all(colsToDel.map(i => deleteCollection(i.id)));
+            if (bookmarksToDel.length > 0) await Promise.all(bookmarksToDel.map(i => deleteBookmark(i.id)));
+          } else {
+            if (assetsToDel.length > 0) await Promise.all(assetsToDel.map(i => updateStatus('asset', i.id, 'trash')));
+            if (colsToDel.length > 0) {
+              const ids = colsToDel.map(i => Number(i.id));
+              await updateCollectionsStatus(ids, 'trash');
+              if (ids.includes(activeCollectionId)) {
+                setActiveCollection(null);
+                setActiveCollectionId(null);
+                setActiveTab('home');
+              }
+            }
+            if (bookmarksToDel.length > 0) await Promise.all(bookmarksToDel.map(i => deleteBookmark(i.id)));
           }
-        }
-      });
-      return;
-    }
 
-    if (activeTab === 'trash') {
-      setDeleteConfirm({
-        isOpen: true,
-        title: '영구 삭제',
-        description: `${count}개의 항목을 영구 삭제하시겠습니까? 복구할 수 없습니다.`,
-        confirmText: '삭제하기',
-        onConfirm: async () => {
-          try {
-            await Promise.all(targetIds.map(id => {
-              const asset = assets.find(a => Number(a.id) === id);
-              return deleteAsset(id, asset?.video_url || "");
-            }));
-            setAssets(assets.filter(a => !targetIds.includes(Number(a.id))));
-            setActiveContext({ type: 'none', items: new Set() });
-            showToast("일괄 삭제되었습니다.", "success");
-          } catch (err) { showToast("일반 삭제에 실패했습니다.", "error"); }
+          clearSelection();
+          queryClient.invalidateQueries({ queryKey: ['collections'] });
+          queryClient.invalidateQueries({ queryKey: ['assets'] });
+          setAssets([]); // 💡 UI Refresh 강제 (깜빡임 효과로 상태 변경 인지)
+          fetchData();
+          showToast(isTrashAction ? "영구 삭제되었습니다." : "휴지통으로 이동되었습니다.", "success");
+        } catch (err) {
+          showToast("작업 중 오류가 발생했습니다.", "error");
         }
-      });
-    } else {
-      setDeleteConfirm({
-        isOpen: true,
-        title: '휴지통 이동',
-        description: `${count}개의 항목을 휴지통으로 이동하시겠습니까?`,
-        confirmText: '이동하기',
-        onConfirm: async () => {
-          try {
-            await Promise.all(targetIds.map(id => updateStatus('asset', id, 'trash')));
-            setAssets(assets.map(a => targetIds.includes(Number(a.id)) ? { ...a, status: 'trash' } : a));
-            setActiveContext({ type: 'none', items: new Set() });
-            showToast("휴지통으로 이동되었습니다.", "success");
-          } catch (err) { showToast("이동에 실패했습니다.", "error"); }
-        }
-      });
-    }
+      }
+    });
   };
 
-  const handleBatchRestore = async () => {
-    if (!activeContext || activeContext.items.size === 0) return;
-    const targetIds = Array.from(activeContext.items).map(Number);
-    const type = activeContext.type;
-
+  const handleIntegratedRestore = async () => {
+    if (selectedItems.length === 0) return;
+    
     try {
-      if (type === 'collection') {
-        // 사용자 요청에 따라 배열을 순회하며 개별 업데이트 호출
-        await Promise.all(targetIds.map(id => updateCollectionStatus(id, 'active')));
-      } else {
-        await Promise.all(targetIds.map(id => updateStatus('asset', id, 'active')));
-        setAssets(assets.map(a => targetIds.includes(Number(a.id)) ? { ...a, status: 'active' } : a));
-      }
+      const assetsToRestore = selectedItems.filter(i => i.type === 'asset');
+      const colsToRestore = selectedItems.filter(i => i.type === 'collection');
+
+      if (assetsToRestore.length > 0) await Promise.all(assetsToRestore.map(i => updateStatus('asset', i.id, 'active')));
+      if (colsToRestore.length > 0) await Promise.all(colsToRestore.map(i => updateCollectionStatus(i.id, 'active')));
       
-      // ✅ 양방향 캐시 무효화 (기본 및 휴지통 목록 모두 동기화)
       queryClient.invalidateQueries({ queryKey: ['collections'] });
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       
-      setActiveContext({ type: 'none', items: new Set() }); 
-      fetchData(); // 💡 폴더 사이드바 즉시 갱신
-      showToast("일괄 복구되었습니다.", "success");
-    } catch (err) { showToast("복구에 실패했습니다.", "error"); }
+      clearSelection();
+      fetchData();
+      showToast("복구되었습니다.", "success");
+    } catch (err) {
+      showToast("복구 중 오류가 발생했습니다.", "error");
+    }
+  };
+
+  const handleBatchPin = async () => {
+    const cols = selectedItems.filter(i => i.type === 'collection');
+    if (cols.length === 0) return;
+    try {
+      await Promise.all(cols.map(i => togglePinCollection(i.id, 1)));
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      showToast("핀 고정되었습니다.", "success");
+      fetchData();
+    } catch (err) {
+      showToast("핀 고정 실패", "error");
+    }
+  };
+
+  const handleRenameSelected = () => {
+    const col = selectedItems.find(i => i.type === 'collection');
+    if (col) {
+      const fullCol = collections.find(c => String(c.id) === String(col.id));
+      if (fullCol) {
+        setEditingCollection(fullCol);
+        setNewCollectionName(fullCol.name);
+        setIsCreatingCollection(true);
+      }
+    }
+  };
+
+  const handleApplyWorkspace = async () => {
+    await handleSaveWorkspace();
+    setEditMode(false);
+    clearSelection();
+  };
+
+  const handleCancelWorkspaceEnhanced = () => {
+    handleCancelWorkspace();
+    setEditMode(false);
+    clearSelection();
   };
 
   const allTags = useMemo(() => {
@@ -808,7 +861,7 @@ export function Dashboard() {
 
   const handleApplyBatchEdit = async (finalTagsObject, finalFoldersObject) => {
     try {
-      const selectedAssets = assets.filter(a => activeContext?.items?.has(String(a.id)) || false);
+      const selectedAssets = assets.filter(a => selectedItems.some(i => i.type === 'asset' && String(i.id) === String(a.id)));
       if (selectedAssets.length === 0) return;
 
       const initialTagSet = new Set();
@@ -837,7 +890,7 @@ export function Dashboard() {
         return;
       }
 
-      await Promise.all(Array.from(activeContext.items).map(id => {
+      await Promise.all(Array.from(selectedItems.filter(i => i.type === 'asset').map(i => i.id)).map(id => {
         const asset = assets.find(a => String(a.id) === id);
         if (!asset) return Promise.resolve();
         
@@ -853,7 +906,7 @@ export function Dashboard() {
       }));
 
       setIsBatchTagModalOpen(false);
-      setActiveContext({ type: 'none', items: new Set() }); // Clear selection
+      clearSelection(); // Clear selection
       fetchData();
       showToast("일괄 업데이트가 완료되었습니다.", "success");
     } catch (err) { 
@@ -928,7 +981,7 @@ export function Dashboard() {
         setIsDirty(false);
       }
 
-      setActiveContext({ type: 'none', items: new Set() });
+      clearSelection();
       showToast("워크스페이스 설정이 저장되었습니다.", "success");
     } catch (err) { 
       console.error("Save workspace failed:", err);
@@ -945,7 +998,7 @@ export function Dashboard() {
       if (initialPreferences.grid_size) setGridSize(Number(initialPreferences.grid_size));
     }
     setIsDirty(false);
-    setActiveContext({ type: 'none', items: new Set() });
+    clearSelection();
   };
 
   if (!isLoaded) {
@@ -984,6 +1037,7 @@ export function Dashboard() {
             
             queryClient.invalidateQueries({ queryKey: ['collections'] });
             queryClient.invalidateQueries({ queryKey: ['assets'] });
+            clearSelection();
             fetchData();
           } catch (err) {
             showToast("삭제에 실패했습니다.", "error");
@@ -1010,6 +1064,7 @@ export function Dashboard() {
             
             queryClient.invalidateQueries({ queryKey: ['collections'] });
             queryClient.invalidateQueries({ queryKey: ['assets'] });
+            clearSelection();
             fetchData();
           } catch (err) {
             showToast("이동에 실패했습니다.", "error");
@@ -1019,6 +1074,9 @@ export function Dashboard() {
     }
   };
 
+  console.log("[Debug Tracker] 뷰 상태:", isTrashView ? "Trash" : "Active");
+  console.log("[Debug Tracker] API 원본 데이터 (assets.length):", assets.length);
+  console.log("[Debug Tracker] 렌더링 직전 데이터 (filteredAssets.length):", filteredAssets.length);
 
   return (
     <div className="h-screen w-full flex bg-background text-content overflow-hidden font-medium">
@@ -1034,17 +1092,17 @@ export function Dashboard() {
           </div>
 
           <nav className="flex flex-col gap-1">
-            <NavBtn active={activeTab === 'home'} onClick={() => { setActiveTab('home'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<Home size={16} strokeWidth={1.5} />} label="홈" isSubItem={true} />
-            <NavBtn active={activeTab === 'all'} onClick={() => { setActiveTab('all'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<Grid size={16} strokeWidth={1.5} />} label="전체 미디어" isSubItem={true} />
+            <NavBtn active={activeTab === 'home'} onClick={(e) => { setActiveTab('home'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<Home size={16} strokeWidth={1.5} />} label="홈" isSubItem={true} />
+            <NavBtn active={activeTab === 'all'} onClick={(e) => { setActiveTab('all'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<Grid size={16} strokeWidth={1.5} />} label="전체 미디어" isSubItem={true} />
           </nav>
 
           <div className="mt-8 mb-2 px-3">
             <span className="text-sm font-semibold text-content">라이브러리</span>
           </div>
           <nav className="flex flex-col gap-1">
-            <NavBtn active={activeTab === 'bookmarks'} onClick={() => { setActiveTab('bookmarks'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<Bookmark size={16} strokeWidth={1.5} />} label="북마크" isSubItem={true} />
-            <NavBtn active={activeTab === 'gallery'} onClick={() => { setActiveTab('gallery'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<ImageIcon size={16} strokeWidth={1.5} />} label="갤러리" isSubItem={true} />
-            <NavBtn active={activeTab === 'trash'} onClick={() => { setActiveTab('trash'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<Trash2 size={16} strokeWidth={1.5} />} label="휴지통" isSubItem={true} />
+            <NavBtn active={activeTab === 'bookmarks'} onClick={(e) => { setActiveTab('bookmarks'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<Bookmark size={16} strokeWidth={1.5} />} label="북마크" isSubItem={true} />
+            <NavBtn active={activeTab === 'gallery'} onClick={(e) => { setActiveTab('gallery'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<ImageIcon size={16} strokeWidth={1.5} />} label="갤러리" isSubItem={true} />
+            <NavBtn active={activeTab === 'trash'} onClick={(e) => { setActiveTab('trash'); setActiveCollection(null); setActiveCollectionId(null); }} icon={<Trash2 size={16} strokeWidth={1.5} />} label="휴지통" isSubItem={true} />
             <NavBtn icon={<Tag size={16} strokeWidth={1.5} />} label="태그" badge="12" isSubItem={true} />
           </nav>
 
@@ -1061,7 +1119,7 @@ export function Dashboard() {
                     placeholder="검색..."
                     className="bg-transparent text-[12px] w-full outline-none placeholder:text-content/30"
                   />
-                  <button onClick={() => { setIsColSearching(false); setColSearchQuery(''); }} className="opacity-40 hover:opacity-100">
+                  <button onClick={(e) => { setIsColSearching(false); setColSearchQuery(''); }} className="opacity-40 hover:opacity-100">
                     <X size={12} />
                   </button>
                 </div>
@@ -1078,27 +1136,19 @@ export function Dashboard() {
             </div>
           </div>
           <div className={`relative group/col-list max-h-[420px] overflow-y-auto scrollbar-hide pr-1 pb-10 transition-all duration-300 ${isEditMode ? 'border border-dashed border-content/10 rounded-2xl p-1 bg-content/[0.01]' : ''}`}>
-             <Reorder.Group as="nav" layoutScroll axis="y" values={pinnedCols} onReorder={handleReorderPinned} className="flex flex-col gap-1" onMouseDown={colSelect.onMouseDown}>
-                {pinnedCols.filter(col => col.name.toLowerCase().includes(colSearchQuery.toLowerCase())).map((col) => (
+             <Reorder.Group as="nav" layoutScroll axis="y" values={pinnedCols} onReorder={handleReorderPinned} className="flex flex-col gap-1">
+                {pinnedCols.filter(col => col.name.toLowerCase().includes(colSearchQuery.toLowerCase())).map((col, idx) => (
                   <Reorder.Item key={col.id} value={col} dragListener={isEditMode} className="relative rounded-full select-none outline-none" data-selectable-id={col.id} data-selectable-type="collection">
                     <NavBtn
                       active={activeCollectionId === col.id}
                       onClick={(e) => { 
-                        if (isEditMode) {
-                          e.preventDefault();
-                          setActiveContext(prev => {
-                            const isAsset = prev.type === 'asset';
-                            const newItems = new Set(isAsset ? [] : prev.items);
-                            const idStr = String(col.id);
-                            if (newItems.has(idStr)) newItems.delete(idStr);
-                            else newItems.add(idStr);
-                            return { type: 'collection', items: newItems };
-                          });
-                          return;
+                        const list = pinnedCols.filter(col => col.name.toLowerCase().includes(colSearchQuery.toLowerCase()));
+                        handleItemClick(e, col, idx, list, 'collection', 'sidebar');
+                        if (!isEditMode) {
+                          setActiveCollection(col.name); 
+                          setActiveCollectionId(col.id); 
+                          setActiveTab('collection'); 
                         }
-                        setActiveCollection(col.name); 
-                        setActiveCollectionId(col.id); 
-                        setActiveTab('collection'); 
                       }}
                       icon={<Folder size={16} strokeWidth={1.5} />} label={col.name} isSubItem={true}
                       onEdit={() => { setEditingCollection(col); setNewCollectionName(col.name); setIsCreatingCollection(true); }}
@@ -1108,27 +1158,19 @@ export function Dashboard() {
                   </Reorder.Item>
                 ))}
              </Reorder.Group>
-             <Reorder.Group as="nav" layoutScroll axis="y" values={unpinnedCols} onReorder={handleReorderUnpinned} className={`flex flex-col gap-1 ${pinnedCols.length > 0 ? 'mt-3' : ''}`} onMouseDown={colSelect.onMouseDown}>
-                {unpinnedCols.filter(col => col.name.toLowerCase().includes(colSearchQuery.toLowerCase())).map((col) => (
+             <Reorder.Group as="nav" layoutScroll axis="y" values={unpinnedCols} onReorder={handleReorderUnpinned} className={`flex flex-col gap-1 ${pinnedCols.length > 0 ? 'mt-3' : ''}`}>
+                {unpinnedCols.filter(col => col.name.toLowerCase().includes(colSearchQuery.toLowerCase())).map((col, idx) => (
                   <Reorder.Item key={col.id} value={col} dragListener={isEditMode} className="relative rounded-full select-none outline-none" data-selectable-id={col.id} data-selectable-type="collection">
                     <NavBtn
                       active={activeCollectionId === col.id}
                       onClick={(e) => { 
-                        if (isEditMode) {
-                          e.preventDefault();
-                          setActiveContext(prev => {
-                            const isAsset = prev.type === 'asset';
-                            const newItems = new Set(isAsset ? [] : prev.items);
-                            const idStr = String(col.id);
-                            if (newItems.has(idStr)) newItems.delete(idStr);
-                            else newItems.add(idStr);
-                            return { type: 'collection', items: newItems };
-                          });
-                          return;
+                        const list = unpinnedCols.filter(col => col.name.toLowerCase().includes(colSearchQuery.toLowerCase()));
+                        handleItemClick(e, col, idx, list, 'collection', 'sidebar');
+                        if (!isEditMode) {
+                          setActiveCollection(col.name); 
+                          setActiveCollectionId(col.id); 
+                          setActiveTab('collection'); 
                         }
-                        setActiveCollection(col.name); 
-                        setActiveCollectionId(col.id); 
-                        setActiveTab('collection'); 
                       }}
                       icon={<Folder size={16} strokeWidth={1.5} />} label={col.name} isSubItem={true}
                       onEdit={() => { setEditingCollection(col); setNewCollectionName(col.name); setIsCreatingCollection(true); }}
@@ -1147,9 +1189,10 @@ export function Dashboard() {
           <nav className="flex flex-col gap-1">
             <NavBtn icon={<Settings size={16} strokeWidth={1.5} />} label="설정" isSubItem={true} />
             <NavBtn icon={<HelpCircle size={16} strokeWidth={1.5} />} label="도움말 및 지원" isSubItem={true} />
-            <button onClick={() => { 
+            <button onClick={(e) => { 
                 // 💡 워크스페이스 편집 진입 시 상태 초기화 (SSOT)
-                setActiveContext({ type: 'workspace', items: new Set() });
+                setEditMode(true);
+                clearSelection();
                 setOriginalCollections([...collections]); 
               }} className="w-fit mt-4 px-3 py-1.5 rounded-lg border border-border/50 text-[10px] uppercase tracking-tighter font-black text-contentMuted hover:border-content/30 hover:text-content transition-all opacity-40 hover:opacity-100">Edit Workspace</button>
           </nav>
@@ -1158,14 +1201,14 @@ export function Dashboard() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full bg-primary relative overflow-hidden">
-        <div className="flex-1 overflow-y-auto custom-scrollbar pt-20 select-none" onMouseDown={handleGridAreaMouseDown}>
+        <div className="flex-1 overflow-y-auto custom-scrollbar pt-20 select-none min-h-screen" onMouseDown={handleMouseDown}>
           <div className="px-12 max-w-[1400px] mx-auto animate-slide-up">
             {/* Bookmark Area */}
             <div className="mb-10 flex justify-center">
               <div className="w-full max-w-[600px]">
                 <div className="flex flex-wrap gap-2 justify-center">
                   {bookmarks.slice(0, 8).map((bm, idx) => (
-                    <div key={bm.id} data-selectable-id={bm.id} data-selectable-type="bookmark" draggable onDragStart={() => setTimeout(() => handleDragStart(idx), 0)} onDragOver={handleDragOver} onDrop={() => handleDrop(idx)} onClick={(e) => { if (isEditMode) return; window.open(bm.url, '_blank'); }} onContextMenu={(e) => { e.preventDefault(); openBookmarkModal(bm); }} className={`group flex flex-col items-center gap-1.5 w-[60px] cursor-pointer transition-all ${draggedIdx === idx ? 'opacity-30 scale-95' : 'opacity-100'} ${activeContext?.type === 'bookmark' && activeContext?.items?.has(String(bm.id)) ? 'ring-2 ring-blue-500 rounded-xl bg-blue-500/10' : ''}`}>
+                    <div key={bm.id} data-selectable-id={bm.id} data-selectable-type="bookmark" draggable onDragStart={() => setTimeout(() => handleDragStart(idx), 0)} onDragOver={handleDragOver} onDrop={() => handleDrop(idx)} onClick={(e) => { if (isEditMode) return; window.open(bm.url, '_blank'); }} onContextMenu={(e) => { e.preventDefault(); openBookmarkModal(bm); }} className={`group flex flex-col items-center gap-1.5 w-[60px] cursor-pointer transition-all ${draggedIdx === idx ? 'opacity-30 scale-95' : 'opacity-100'} ${selectedItems.some(i => String(i.id) === String(bm.id)) ? 'ring-2 ring-blue-500 rounded-xl bg-blue-500/10' : ''}`}>
                       <div className="w-10 h-10 rounded-full shadow-sm flex items-center justify-center group-hover:scale-110 transition-all duration-300 relative overflow-hidden pointer-events-none" style={{ backgroundColor: bm.icon_value === 'transparent' ? 'transparent' : (bm.icon_value || 'var(--bg-surface)') }}>
                         <img src={`https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=128`} className="w-full h-full object-cover z-10" style={{ transform: `scale(${bm.icon_scale || 1.0}) translate(${bm.icon_offset_x || 0}px, ${bm.icon_offset_y || 0}px)` }} alt={bm.name} />
                         {bm.icon_value !== 'transparent' && <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />}
@@ -1179,7 +1222,7 @@ export function Dashboard() {
             </div>
 
             {/* Search Area */}
-            <div className="mb-12 flex justify-center">
+            <div className="mb-12 flex justify-center" onMouseDown={(e) => e.stopPropagation()}>
               <div className="w-full max-w-[600px] relative group">
                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-contentMuted group-focus-within:text-content transition-colors" size={20} />
                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="디자인 라이브러리 검색..." className="w-full h-14 bg-surface border-2 border-border/50 rounded-2xl pl-14 pr-6 text-[15px] font-medium focus:outline-none focus:border-content/10 focus:ring-4 focus:ring-content/5 transition-all shadow-sm" />
@@ -1187,29 +1230,31 @@ export function Dashboard() {
             </div>
 
             {/* Tags */}
-            <div className="mb-8 flex flex-wrap items-center gap-3">
-              <div onClick={() => { setActiveTab('all'); setSearchQuery(''); setActiveCollection(null); }} className={`px-4 py-2 rounded-xl font-black text-[11px] shadow-lg cursor-pointer transition-all ${!searchQuery && activeTab === 'all' ? 'bg-content text-background scale-105' : 'bg-surface border border-border text-content hover:border-content/20'}`}>전체보기</div>
+            <div className="mb-8 flex flex-wrap items-center gap-3" onMouseDown={(e) => e.stopPropagation()}>
+              <div onClick={(e) => { setActiveTab('all'); setSearchQuery(''); setActiveCollection(null); }} className={`px-4 py-2 rounded-xl font-black text-[11px] shadow-lg cursor-pointer transition-all ${!searchQuery && activeTab === 'all' ? 'bg-content text-background scale-105' : 'bg-surface border border-border text-content hover:border-content/20'}`}>전체보기</div>
               {['브랜딩', 'UI 패턴', '아이콘', '영감'].map(tag => (
                 <div key={tag} onClick={() => setSearchQuery(tag)} className={`px-4 py-2 border rounded-xl text-[11px] font-bold cursor-pointer transition-colors ${searchQuery === tag ? 'bg-content text-background border-content' : 'bg-surface border-border hover:border-content/20'}`}>{tag}</div>
               ))}
               <button onClick={() => setIsCreatingCollection(true)} className="p-2 hover:bg-surface rounded-xl border border-dashed border-border"><Plus size={14} /></button>
             </div>
 
-            <ControlBar 
-              activeTab={activeTab} 
-              activeCollection={activeCollection} 
-              viewMode={viewMode} 
-              setViewMode={(mode) => { 
-                setViewMode(mode); 
-                if (isEditMode) setIsDirty(true);
-              }} 
-              viewSize={viewMode === 'masonry' ? masonrySize : gridSize}
-              setViewSize={(size) => { 
-                if (viewMode === 'masonry') setMasonrySize(size);
-                else setGridSize(size);
-                if (isEditMode) setIsDirty(true);
-              }}
-            />
+            <div onMouseDown={(e) => e.stopPropagation()}>
+              <ControlBar 
+                activeTab={activeTab} 
+                activeCollection={activeCollection} 
+                viewMode={viewMode} 
+                setViewMode={(mode) => { 
+                  setViewMode(mode); 
+                  if (isEditMode) setIsDirty(true);
+                }} 
+                viewSize={viewMode === 'masonry' ? masonrySize : gridSize}
+                setViewSize={(size) => { 
+                  if (viewMode === 'masonry') setMasonrySize(size);
+                  else setGridSize(size);
+                  if (isEditMode) setIsDirty(true);
+                }}
+              />
+            </div>
 
             <div id="gallery-grid-area" className="pb-24 min-h-[500px] select-none">
                {activeTab === 'trash' && trashCollections.length > 0 && !loading && (
@@ -1223,27 +1268,16 @@ export function Dashboard() {
                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 px-2">
                      {trashCollections.map(col => (
                        <div 
-                         key={col.id} 
-                         onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveContext(prev => {
-                              const isCollection = prev.type === 'collection';
-                              const newItems = new Set(isCollection ? prev.items : []);
-                              const idStr = String(col.id);
-                              if (newItems.has(idStr)) newItems.delete(idStr);
-                              else newItems.add(idStr);
-                              return { type: 'collection', items: newItems };
-                            });
-                         }}
+                         key={col.id} onMouseDown={(e) => e.stopPropagation()}                          onClick={(e) => handleItemClick(e, col, trashCollections.indexOf(col), trashCollections, "collection", "trash")}
                          className={`group relative aspect-square bg-surface border rounded-2xl transition-all cursor-pointer flex flex-col items-center justify-center gap-2 p-4
-                           ${activeContext.type === 'collection' && activeContext.items.has(String(col.id)) 
+                          ${selectedItems.some(i => String(i.id) === String(col.id)) 
                              ? 'border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/20 shadow-md' 
                              : 'border-border hover:border-red-400/30 hover:bg-red-400/5'}`}
                          data-selectable-id={col.id}
                          data-selectable-type="collection"
                        >
                          <div className={`p-3 rounded-2xl transition-all
-                           ${activeContext.type === 'collection' && activeContext.items.has(String(col.id))
+                           ${selectedItems.some(i => String(i.id) === String(col.id))
                              ? 'bg-blue-500 text-white shadow-sm'
                              : 'bg-red-400/10 text-red-500 group-hover:bg-red-400/20'}`}>
                            <Folder size={24} strokeWidth={1.5} />
@@ -1251,7 +1285,7 @@ export function Dashboard() {
                          <span className="text-[11px] font-bold truncate w-full text-center px-2 text-content">{col.name}</span>
                          
                          {/* Selection Indicator */}
-                         {activeContext.type === 'collection' && activeContext.items.has(String(col.id)) && (
+                         {selectedItems.some(i => String(i.id) === String(col.id)) && (
                            <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-sm scale-110 animate-pulse">
                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                            </div>
@@ -1270,9 +1304,9 @@ export function Dashboard() {
                      <p className="text-sm text-contentMuted font-medium">데이터를 불러오는 중입니다...</p>
                    </div>
                    {viewMode === 'masonry' && (
-                     <Masonry 
-                        ref={masonryRef} breakpointCols={breakpointColumnsObj} 
-                        className="flex gap-3 w-auto" 
+                     <Masonry
+                        ref={masonryRef} breakpointCols={breakpointColumnsObj}
+                        className="flex gap-3 w-auto"
                         columnClassName="bg-clip-padding"
                       >
                         {Array(12).fill(null).map((_, idx) => (
@@ -1284,58 +1318,66 @@ export function Dashboard() {
                ) : (filteredAssets.length > 0) ? (
                  <div ref={gridContainerRef}>
                    {viewMode === 'masonry' && (
-                     <Masonry 
-                        ref={masonryRef} breakpointCols={breakpointColumnsObj} 
-                        className="flex gap-3 w-auto" 
+                     <Masonry
+                        ref={masonryRef} breakpointCols={breakpointColumnsObj}
+                        className="flex gap-3 w-auto"
                         columnClassName="bg-clip-padding"
                       >
-                        {filteredAssets.map((asset, idx) => (
-                          <div key={asset.id} data-selectable-id={asset.id} data-selectable-type="asset" className="gallery-item-wrapper break-inside-avoid mb-4">
-                            <GalleryCard 
-                              asset={asset} 
-                              onClick={() => { if (!isEditMode) openImageModal(asset); }} 
-                              isSelected={activeContext?.items?.has(String(asset.id)) || false} 
-                              isEditMode={isEditMode} 
-                              viewMode="masonry" 
-                              openImageModal={openImageModal} 
-                              priority={idx < 10} 
-                            />
-                          </div>
-                        ))}
-                     </Masonry>
-                   )}
-                   {viewMode === 'grid' && (
-                     <div 
-                        className="grid gap-3"
-                        style={{ 
-                          gridTemplateColumns: `repeat(${Math.max(2, Math.floor(11 - gridSize))}, minmax(0, 1fr))` 
-                        }}
-                      >
-                        {filteredAssets.map((asset, idx) => (
-                           <div key={asset.id} data-selectable-id={asset.id} data-selectable-type="asset" className="gallery-item-wrapper">
-                             <GalleryCard asset={asset} onClick={() => { isEditMode ? null : openImageModal(asset); }} isSelected={activeContext?.items?.has(String(asset.id)) || false} isEditMode={isEditMode} viewMode="grid" openImageModal={openImageModal} priority={idx < 10} />
-                           </div>
-                        ))}
-                     </div>
-                   )}
-           {/* 💡 전역 드래그 박스 Portal (useWebDragSelect 상태 사용) */}
-           {createPortal(
-            (() => {
-              const d = assetWebSelect.dragBox;
-              if (!d) return null;
-              return (
-                <div style={{ position: 'fixed', left: Math.min(d.x1, d.x2), top: Math.min(d.y1, d.y2), width: Math.abs(d.x2 - d.x1), height: Math.abs(d.y2 - d.y1), backgroundColor: 'rgba(0, 102, 255, 0.08)', border: '1px solid rgba(0, 102, 255, 0.5)', borderRadius: '4px', pointerEvents: 'none', zIndex: 9999 }} />
-              );
-            })(),
-             document.body
-           )}
-                   {viewMode === 'list' && (
-                     <div className="flex flex-col gap-2">
-                       {filteredAssets.map((asset, idx) => (
-                         <ListRow key={asset.id} asset={asset} onClick={() => isEditMode ? assetSelect.handleSelect(asset.id) : openImageModal(asset)} isSelected={activeContext?.items?.has(String(asset.id)) || false} onToggleSelect={assetSelect.handleSelect} isEditMode={isEditMode} openImageModal={openImageModal} priority={idx < 10} />
-                       ))}
-                     </div>
-                   )}
+                   {filteredAssets.map((asset, idx) => (
+                      <div key={asset.id} onMouseDown={(e) => e.stopPropagation()} data-selectable-id={asset.id} data-selectable-type="asset" className="gallery-item-wrapper break-inside-avoid mb-4">
+                        <GalleryCard 
+                          asset={asset} 
+                          onClick={(e) => { 
+                            handleItemClick(e, asset, idx, filteredAssets, 'asset', isTrashView ? 'trash' : 'gallery');
+                          }} 
+                          isSelected={selectedItems.some(i => String(i.id) === String(asset.id))} 
+                          isEditMode={isEditMode} 
+                          viewMode="masonry" 
+                          openImageModal={openImageModal} 
+                          priority={idx < 10} 
+                        />
+                      </div>
+                    ))}
+                 </Masonry>
+               )}
+               {viewMode === 'grid' && (
+                 <div 
+                    className="grid gap-3"
+                    style={{ 
+                      gridTemplateColumns: `repeat(${Math.max(2, Math.floor(11 - gridSize))}, minmax(0, 1fr))` 
+                    }}
+                  >
+                    {filteredAssets.map((asset, idx) => (
+                       <div key={asset.id} onMouseDown={(e) => e.stopPropagation()} data-selectable-id={asset.id} data-selectable-type="asset" className="gallery-item-wrapper">
+                         <GalleryCard 
+                           asset={asset} 
+                           onClick={(e) => handleItemClick(e, asset, idx, filteredAssets, 'asset', isTrashView ? 'trash' : 'gallery')} 
+                           isSelected={selectedItems.some(i => String(i.id) === String(asset.id))} 
+                           isEditMode={isEditMode} 
+                           viewMode="grid" 
+                           openImageModal={openImageModal} 
+                           priority={idx < 10} 
+                         />
+                       </div>
+                    ))}
+                 </div>
+               )}
+               {/* 💡 전역 드래그 박스 Portal (useWebDragSelect 제거됨 - 필요 시 Zustand 기반으로 재구현 가능) */}
+               {viewMode === 'list' && (
+                 <div className="flex flex-col gap-2">
+                   {filteredAssets.map((asset, idx) => (
+                     <ListRow 
+                       key={asset.id} 
+                       asset={asset} 
+                       onClick={(e) => handleItemClick(e, asset, idx, filteredAssets, "asset", isTrashView ? "trash" : "gallery")}
+                       isSelected={selectedItems.some(i => String(i.id) === String(asset.id))} 
+                       isEditMode={isEditMode} 
+                       openImageModal={openImageModal} 
+                       priority={idx < 10} 
+                     />
+                   ))}
+                 </div>
+               )}
                  </div>
                ) : (
                 <div className="py-40 text-center bg-surface/30 border-2 border-dashed border-border rounded-[40px] animate-slide-up">
@@ -1348,15 +1390,8 @@ export function Dashboard() {
             </div>
           </div>
 
-          {(assetSelect.dragBox || colSelect.dragBox || bookmarkSelect.dragBox) && createPortal(
-            (() => {
-              const d = assetSelect.dragBox || colSelect.dragBox || bookmarkSelect.dragBox;
-              return (
-                <div style={{ position: 'fixed', left: Math.min(d.x1, d.x2), top: Math.min(d.y1, d.y2), width: Math.abs(d.x2 - d.x1), height: Math.abs(d.y2 - d.y1), backgroundColor: 'rgba(0, 102, 255, 0.08)', border: '1px solid rgba(0, 102, 255, 0.5)', borderRadius: '4px', pointerEvents: 'none', zIndex: 9999 }} />
-              );
-            })(),
-             document.body
-           )}
+
+
 
           <style jsx global>{`
             /* 💡 드래그 중인 요소(Real-time highlight) 스타일 */
@@ -1372,134 +1407,29 @@ export function Dashboard() {
             }
           `}</style>
 
-          {/* Dynamic Context Bar (Integrated & Advanced Layout) */}
-          <AnimatePresence>
-            {isEditMode && (
-              <motion.div
-                layout
-                initial={{ y: 100, x: "-50%", opacity: 0 }}
-                animate={{ y: 0, x: "-50%", opacity: 1 }}
-                exit={{ y: 100, x: "-50%", opacity: 0 }}
-                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                className="fixed bottom-10 left-1/2 z-[1000] flex items-center p-1.5 bg-[#1c1c1c]/90 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-full min-h-[52px]"
-              >
-                {/* 1. 좌측 (Always): 맥박 인디케이터 + 상태 텍스트 */}
-                <div className="flex items-center gap-3 px-4 shrink-0 whitespace-nowrap">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                  <span className="text-[13px] font-bold text-white/90 tracking-tight">워크스페이스 편집 중</span>
-                </div>
+          {/* 🧩 Separated Dedicated Floating Bar Component (Zustand 대응) */}
+          <FloatingBar 
+            isEditMode={isEditMode}
+            selectedItems={selectedItems}
+            onDelete={handleIntegratedDelete}
+            onEditTags={() => setIsBatchTagModalOpen(true)}
+            onCancel={handleCancelWorkspaceEnhanced}
+          />
+          
+          {/* Drag Selection Marquee Box */}
+          {isDragging && selectionBox && (
+            <div
+              className="fixed border border-blue-500 bg-blue-500/20 z-[9999]"
+              style={{
+                pointerEvents: 'none', // 클릭 방해 방지
+                left: selectionBox.left,
+                top: selectionBox.top,
+                width: selectionBox.width,
+                height: selectionBox.height,
+              }}
+            />
+          )}
 
-                {/* 2. 중앙 (Conditional): 선택 시에만 노출되는 액션 영역 */}
-                <AnimatePresence mode="wait">
-                  {activeContext.items.size > 0 && (
-                    <motion.div 
-                      key={activeContext.type}
-                      initial={{ opacity: 0, width: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, width: "auto", scale: 1 }}
-                      exit={{ opacity: 0, width: 0, scale: 0.9 }}
-                      className="flex items-center overflow-hidden"
-                    >
-                      <div className="w-[1px] h-4 bg-white/10 mx-1 shrink-0" />
-                      
-                      {activeContext.type === 'asset' ? (
-                        <div className="flex items-center gap-1.5 px-2">
-                          <div className="flex items-center gap-2 px-2 text-white/90 font-bold text-[13px] tracking-tight">
-                            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded bg-white/20 text-[11px] font-black">{activeContext.items.size}</span>
-                            <span>Selected</span>
-                          </div>
-
-                          {/* 💡 전체 선택 / 해제 토글 버튼 */}
-                          <button 
-                            onClick={() => {
-                              if (activeContext.items.size === filteredAssets.length) {
-                                setActiveContext({ type: 'none', items: new Set() });
-                              } else {
-                                setActiveContext({ type: 'asset', items: new Set(filteredAssets.map(a => String(a.id))) });
-                              }
-                            }}
-                            className="text-[11px] font-bold text-blue-400 hover:text-blue-300 px-2 py-1 rounded-md hover:bg-white/5 transition-all"
-                          >
-                            {activeContext.items.size === filteredAssets.length ? 'Deselect All' : 'Select All'}
-                          </button>
-                          <button 
-                            className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all" 
-                            onClick={() => setIsBatchTagModalOpen(true)}
-                          >
-                            <Edit2 size={14} strokeWidth={2.5} /> Batch Edit
-                          </button>
-                          {activeTab === 'trash' && (
-                            <button 
-                              className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded-full transition-all"
-                              onClick={handleBatchRestore}
-                            >
-                              <RefreshCw size={14} strokeWidth={2.5} /> Restore
-                            </button>
-                          )}
-                          <button 
-                            className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-red-500 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-all" 
-                            onClick={handleBatchDelete}
-                          >
-                            <Trash2 size={14} strokeWidth={2.5} /> Delete
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 px-2">
-                           <div className="flex items-center gap-2 px-2 text-white/90 font-bold text-[13px] tracking-tight">
-                              <Folder size={14} className="text-blue-400" />
-                              <span className="max-w-[120px] truncate">
-                                {activeContext.items.size > 1 ? `${activeContext.items.size} Folders` : collections.find(c => c.id === Array.from(activeContext.items)[0])?.name || 'Folder'}
-                              </span>
-                            </div>
-                            <button className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">
-                              <Edit2 size={14} strokeWidth={2.5} /> Rename
-                            </button>
-                            {activeTab === 'trash' ? (
-                              <button 
-                                className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 rounded-full transition-all"
-                                onClick={handleBatchRestore}
-                              >
-                                <RefreshCw size={14} strokeWidth={2.5} /> Restore
-                              </button>
-                            ) : (
-                              <>
-                                <button className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all">
-                                  <Pin size={14} strokeWidth={2.5} /> Pin
-                                </button>
-                                <button 
-                                  className="h-9 px-4 flex items-center gap-2 text-[12px] font-bold text-red-500 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-all" 
-                                  onClick={handleBatchDelete}
-                                >
-                                  <Trash2 size={14} strokeWidth={2.5} /> Delete
-                                </button>
-                              </>
-                            )}
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* 3. 우측 (Always): 구분선 + 취소/저장 버튼 */}
-                <div className="flex items-center shrink-0">
-                  <div className="w-[1px] h-4 bg-white/10 mx-1" />
-                  <div className="flex items-center gap-1 px-2 pr-2">
-                    <button 
-                      onClick={handleCancelWorkspace} 
-                      className="h-9 px-4 text-[13px] font-bold text-white/40 hover:text-white transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={handleSaveWorkspace} 
-                      className="h-9 px-6 bg-white text-black rounded-full text-[13px] font-black shadow-lg shadow-white/5 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </main>
 
@@ -1510,7 +1440,7 @@ export function Dashboard() {
                 <motion.div initial={{ y: 20 }} animate={{ y: 0 }} className="bg-background border border-border w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl p-8">
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-[18px] font-bold">{editingCollection ? '컬렉션 수정' : '새 컬렉션'}</h2>
-                        <button onClick={() => { setIsCreatingCollection(false); setEditingCollection(null); setNewCollectionName(''); }}><X size={20} /></button>
+                        <button onClick={(e) => { setIsCreatingCollection(false); setEditingCollection(null); setNewCollectionName(''); }}><X size={20} /></button>
                     </div>
                     <form onSubmit={async (e) => {
                         e.preventDefault(); if (isSubmitting || !newCollectionName.trim()) return; setIsSubmitting(true);
@@ -1753,7 +1683,7 @@ export function Dashboard() {
       <BatchEditModal 
         isOpen={isBatchTagModalOpen} 
         onClose={() => setIsBatchTagModalOpen(false)} 
-        selectedAssets={assets.filter(a => activeContext?.items?.has(String(a.id)))}
+        selectedAssets={assets.filter(a => selectedItems.some(i => i.type === 'asset' && String(i.id) === String(a.id)))}
         onApply={handleApplyBatchEdit}
         collections={collections}
         allTags={allTags}
