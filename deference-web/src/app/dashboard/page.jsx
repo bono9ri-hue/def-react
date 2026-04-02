@@ -2,7 +2,7 @@ import AssetGrid from "@/components/dashboard/AssetGrid";
 
 export default function DashboardPage() {
   return (
-    <div className="flex-1 w-full p-4 md:p-8">
+    <div className="flex-1 w-full layout-padding py-6">
       {/* 대시보드 헤더 영역 */}
       <div className="flex flex-col gap-1 mb-8">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">All References</h1>

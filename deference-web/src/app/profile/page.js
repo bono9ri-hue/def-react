@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from 'react';
 import { useUser, UserButton } from "@clerk/nextjs";
-import useAssetStore from "@/store/useAssetStore";
+import { useQuery } from '@tanstack/react-query';
+import { fetchCollections } from '@/lib/api';
 import { LogOut, Settings, LayoutGrid, ChevronRight } from "lucide-react";
 import Link from 'next/link';
 
@@ -11,14 +11,28 @@ import Link from 'next/link';
  * Integrates Clerk user data and D1 collection data for a unified management view.
  */
 export default function ProfilePage() {
-  const { user, isLoaded } = useUser();
-  const { collections, fetchCollections } = useAssetStore();
+  const { user, isLoaded: isUserLoaded } = useUser();
+  
+  const { 
+    data: collections = [], 
+    isLoading: isCollectionsLoading,
+    isError 
+  } = useQuery({
+    queryKey: ['collections'],
+    queryFn: fetchCollections,
+  });
 
-  useEffect(() => {
-    fetchCollections();
-  }, [fetchCollections]);
+  const isLoaded = isUserLoaded && !isCollectionsLoading;
 
-  if (!isLoaded) {
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-white/40">
+        <p>Failed to load collections. Please try again later.</p>
+      </div>
+    );
+  }
+
+  if (!isUserLoaded || (isCollectionsLoading && !collections.length)) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-white/20 border-t-white/80 rounded-full animate-spin" />
@@ -29,7 +43,7 @@ export default function ProfilePage() {
   const CDN_BASE = process.env.NEXT_PUBLIC_CDN_URL;
 
   return (
-    <div className="min-h-screen bg-black text-white p-8 md:p-12 selection:bg-white/10">
+    <div className="min-h-screen bg-black text-white layout-padding py-10 selection:bg-white/10">
       {/* Header Container */}
       <div className="max-w-6xl mx-auto">
         <header className="flex items-center justify-between mb-16">

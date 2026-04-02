@@ -3,22 +3,22 @@
 import * as React from "react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { 
-  Menu, 
-  Search, 
-  Plus, 
-  Bell, 
-  User, 
-  Settings, 
-  LogOut, 
-  Sun, 
-  Moon, 
+import {
+  Menu,
+  Search,
+  Plus,
+  Bell,
+  User,
+  Settings,
+  LogOut,
+  Sun,
+  Moon,
   Monitor,
   MoreHorizontal,
   Home
 } from "lucide-react";
 import Link from "next/link";
-import { navigationData } from "@/config/navigation";
+// import { navigationData } from "@/config/navigation"; // 미사용시 주석 유지
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -72,13 +72,14 @@ export function TopHeader() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 flex h-20 w-full items-center justify-between px-4 bg-transparent md:bg-background/95 md:backdrop-blur-sm shrink-0">
-      {/* Left Area: Sidebar Toggle (Hamburger Menu) */}
-      <div className="flex items-center">
+    <header className="sticky top-0 z-40 flex items-center justify-between h-20 w-full layout-padding bg-transparent md:bg-background/95 md:backdrop-blur-sm shrink-0 gap-4">
+      
+      {/* Left Area: 햄버거 메뉴 (flex-1) */}
+      <div className="flex flex-1 items-center justify-start min-w-0 z-10">
         <Button 
-          variant="ghost" 
-          size="icon" 
-          className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] text-white hover:bg-[oklch(0.269_0_0)]/90 hover:text-white !ring-0 !outline-none p-0 transition-colors" 
+          variant="secondary" 
+          size="icon"
+          className="flex-shrink-0 rounded-full !ring-0 !outline-none p-0 transition-colors"
           onClick={toggleSidebar}
         >
           <Menu className="h-5 w-5" strokeWidth={1.5} />
@@ -86,33 +87,32 @@ export function TopHeader() {
         </Button>
       </div>
 
-      {/* Center Area: Global Search Trigger */}
-      <div className="hidden md:flex flex-1 items-center justify-center px-4 max-w-md mx-auto">
+      {/* Center Area: Global Search (flex-1 & shrinkable) */}
+      <div className="hidden md:flex flex-1 w-full max-w-md justify-center shrink min-w-0 z-0">
         <Button
           variant="outline"
-          className="relative h-9 w-full justify-start rounded-[0.5rem] bg-secondary hover:bg-secondary/80 border border-border text-secondary-foreground shadow-sm sm:pr-12 md:w-full transition-colors !ring-0 !outline-none"
+          className="relative h-9 w-full shrink justify-start rounded-[0.5rem] bg-secondary hover:bg-secondary/80 border border-border text-secondary-foreground transition-colors !ring-0 !outline-none pointer-events-auto overflow-hidden"
           onClick={() => setOpen(true)}
         >
-          <Search className="w-4 h-4 mr-2" strokeWidth={1.5} />
-          <span className="hidden lg:inline-flex">Search collections and assets...</span>
-          <span className="inline-flex lg:hidden">Search...</span>
+          <Search className="w-4 h-4 mr-2 shrink-0" strokeWidth={1.5} />
+          <span className="hidden lg:inline-flex truncate mr-8">Search collections and assets...</span>
+          <span className="inline-flex lg:hidden truncate mr-8">Search...</span>
           <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-6 select-none items-center gap-1 rounded border border-border/50 bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:flex">
             {mounted ? (isMac ? "⌘K" : "Ctrl+K") : "⌘K"}
           </kbd>
         </Button>
       </div>
 
-      {/* Right Area: Utility Actions (Desktop Only - Decoupled for Blinking Prevention) */}
-      <div className="hidden md:flex items-center gap-1.5">
-        {/* 1. 인증 상태와 무관하게 즉시 렌더링되는 고정 UI (깜빡임 완벽 제거) */}
-        {/* [Upload 버튼 (+)] */}
+      {/* Right Area: Utility Actions (flex-1) */}
+      <div className="hidden md:flex flex-1 items-center justify-end gap-1.5 min-w-0 z-10">
+        {/* [Upload 버튼] */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button 
-              aria-label="Add new space" 
-              variant="ghost" 
-              size="icon" 
-              className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] text-white hover:bg-[oklch(0.269_0_0)]/90 hover:text-white !ring-0 !outline-none p-0 transition-colors"
+            <Button
+              aria-label="Add new space"
+              variant="secondary"
+              size="icon"
+              className="flex-shrink-0 rounded-full !ring-0 !outline-none p-0 transition-colors"
             >
               <Plus className="!h-5 !w-5" strokeWidth={1.5} />
             </Button>
@@ -125,14 +125,14 @@ export function TopHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* [Notification 버튼 (알림 + 빨간점)] */}
+        {/* [Notification 버튼] */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button 
-              aria-label="Notifications" 
-              variant="ghost" 
-              size="icon" 
-              className="relative w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] text-white hover:bg-[oklch(0.269_0_0)]/90 hover:text-white !ring-0 !outline-none p-0 transition-colors"
+            <Button
+              aria-label="Notifications"
+              variant="secondary"
+              size="icon"
+              className="relative flex-shrink-0 rounded-full !ring-0 !outline-none p-0 transition-colors"
             >
               <Bell className="h-4 w-4" strokeWidth={1.5} />
               <span className="absolute top-[2.5px] right-[2.5px] flex !h-1.5 !w-1.5">
@@ -150,14 +150,14 @@ export function TopHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* 2. 뷰 제어 및 설정 버튼 (...) - 아바타 드롭다운 메뉴 이관 */}
+        {/* [View Controls 버튼] */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button 
-              aria-label="View Controls & Settings" 
-              variant="ghost" 
-              size="icon" 
-              className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] text-white hover:bg-[oklch(0.269_0_0)]/90 hover:text-white !ring-0 !outline-none p-0 transition-colors"
+            <Button
+              aria-label="View Controls & Settings"
+              variant="secondary"
+              size="icon"
+              className="flex-shrink-0 rounded-full !ring-0 !outline-none p-0 transition-colors"
             >
               <MoreHorizontal className="h-5 w-5" strokeWidth={1.5} />
             </Button>
@@ -211,19 +211,20 @@ export function TopHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* 3. 유저 아바타 - 클릭 시 즉시 프로필 페이지로 이동 */}
+        {/* [유저 아바타] */}
         {!isLoaded ? (
-          <Skeleton className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full p-0" />
+          <Skeleton className="w-10 h-10 flex-shrink-0 rounded-full" />
         ) : isSignedIn ? (
           <Link href="/profile">
-            <Button 
-              variant="ghost" 
-              className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] flex items-center justify-center p-0 focus-visible:ring-0 overflow-hidden relative !ring-0 !outline-none transition-colors"
+            <Button
+              variant="secondary"
+              size="icon"
+              className="flex-shrink-0 rounded-full flex items-center justify-center p-0 focus-visible:ring-0 overflow-hidden relative !ring-0 !outline-none transition-colors"
             >
               <Avatar className="w-full h-full shrink-0 rounded-none pointer-events-none">
-                <AvatarImage 
-                  src={clerkUser?.imageUrl} 
-                  alt={clerkUser?.fullName || "User"} 
+                <AvatarImage
+                  src={clerkUser?.imageUrl}
+                  alt={clerkUser?.fullName || "User"}
                   className="object-cover w-full h-full rounded-full"
                 />
                 <AvatarFallback className="bg-muted animate-pulse" />
@@ -242,19 +243,19 @@ export function TopHeader() {
         )}
       </div>
 
-      {/* [Clerk UserProfile Modal] */}
+      {/* (모달 및 하단 바 코드는 기존과 동일하게 유지) */}
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
         <DialogContent className="w-auto max-w-none flex justify-center p-0 border-none bg-transparent shadow-none outline-none [&>button]:hidden">
           <DialogTitle className="sr-only">User Profile Settings</DialogTitle>
           <DialogDescription className="sr-only">Manage your account settings and preferences.</DialogDescription>
-          <UserProfile 
-            routing="hash" 
+          <UserProfile
+            routing="hash"
             appearance={{
               baseTheme: theme === "dark" ? dark : undefined,
               elements: {
                 rootBox: "mx-auto w-full",
-                cardBox: "shadow-none border-none rounded-xl bg-background", 
-                navbar: "border-none bg-background", 
+                cardBox: "shadow-none border-none rounded-xl bg-background",
+                navbar: "border-none bg-background",
                 scrollBox: "border-none bg-background rounded-none",
                 navbarButton: "text-muted-foreground hover:bg-muted hover:text-foreground",
                 headerTitle: "text-foreground font-semibold",
@@ -270,9 +271,8 @@ export function TopHeader() {
         </DialogContent>
       </Dialog>
 
-      {/* [Command Palette Modal] */}
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <Command className="rounded-lg border shadow-md w-full">
+        <Command className="rounded-lg border w-full">
           <CommandInput placeholder="Search collections, assets, folders..." />
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
@@ -297,19 +297,32 @@ export function TopHeader() {
         </Command>
       </CommandDialog>
 
-      {/* Mobile Bottom Floating Bar (Improved Synergy & Organic Scaling) */}
+      {/* 모바일 하단 플로팅 바 */}
       <nav className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center gap-6 px-6 h-16 w-max max-w-[calc(100%-2rem)] rounded-full bg-background/80 backdrop-blur-xl border border-border shadow-lg overflow-hidden">
-        <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 min-w-0 shrink transition-all duration-300">
+        <Button 
+          variant="ghost" 
+          size="icon-lg" 
+          className="flex-1 max-w-[48px] rounded-full !ring-0 min-w-0 shrink transition-all duration-300"
+        >
           <Home className="!h-6 !w-6 text-muted-foreground" />
         </Button>
 
-        <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 min-w-0 shrink transition-all duration-300" onClick={() => setOpen(true)}>
+        <Button 
+          variant="ghost" 
+          size="icon-lg" 
+          className="flex-1 max-w-[48px] rounded-full !ring-0 min-w-0 shrink transition-all duration-300" 
+          onClick={() => setOpen(true)}
+        >
           <Search className="!h-6 !w-6 text-muted-foreground" />
         </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 min-w-0 shrink transition-all duration-300">
+            <Button 
+              variant="ghost" 
+              size="icon-lg" 
+              className="flex-1 max-w-[48px] rounded-full !ring-0 min-w-0 shrink transition-all duration-300"
+            >
               <Plus className="!h-6 !w-6 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
@@ -323,7 +336,11 @@ export function TopHeader() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 min-w-0 shrink transition-all duration-300">
+            <Button 
+              variant="ghost" 
+              size="icon-lg" 
+              className="flex-1 max-w-[48px] rounded-full !ring-0 min-w-0 shrink transition-all duration-300"
+            >
               <div className="relative">
                 <Bell className="!h-6 !w-6 text-muted-foreground" />
                 <span className="absolute -top-1 -right-1 !h-2.5 !w-2.5 rounded-full bg-red-500 border-2 border-background" />
@@ -339,8 +356,13 @@ export function TopHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 p-0 min-w-0 shrink transition-all duration-300" onClick={() => setIsProfileOpen(true)}>
-          <Avatar className="!h-9 !w-9 shrink-0">
+        <Button 
+          variant="ghost" 
+          size="icon-lg" 
+          className="flex-1 max-w-[48px] rounded-full !ring-0 p-0 min-w-0 shrink transition-all duration-300" 
+          onClick={() => setIsProfileOpen(true)}
+        >
+          <Avatar className="w-full h-full shrink-0">
             <AvatarImage src={clerkUser?.imageUrl} alt={clerkUser?.fullName || "User"} />
             <AvatarFallback className="bg-muted animate-pulse" />
           </Avatar>

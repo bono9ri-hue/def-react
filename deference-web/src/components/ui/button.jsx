@@ -21,17 +21,12 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default:
-          "h-9 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),8px)] px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 gap-1 rounded-[min(var(--radius-md),10px)] px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
-        lg: "h-10 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-9",
-        "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),8px)] in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-8 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-md",
-        "icon-lg": "size-10",
+        default: "h-10 px-4 py-2 text-sm", // 40px: 데스크톱 기본 규격 및 서브 액션
+        sm: "h-8 px-3 text-xs",            // 32px: 테이블/카드 내부 등 밀도 높은 UI용
+        lg: "h-12 px-8 text-base",         // 48px: 모바일 터치 최적화 및 주요 CTA 버튼
+        icon: "h-10 w-10",                 // 40x40px: 기본 아이콘 버튼
+        "icon-sm": "h-8 w-8",              // 32x32px: 작은 아이콘 버튼
+        "icon-lg": "h-12 w-12",            // 48x48px: 모바일 타겟용 큰 아이콘 버튼
       },
     },
     defaultVariants: {

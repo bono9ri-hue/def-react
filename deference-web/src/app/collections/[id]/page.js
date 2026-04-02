@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Share2, MoreHorizontal, Trash2 } from 'lucide-react';
-import useAssetStore from '@/store/useAssetStore';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchCollections, fetchCollectionAssets, deleteCollectionApi } from '@/lib/api';
 import AssetGrid from '@/components/dashboard/AssetGrid';
 
 /**
@@ -13,15 +13,43 @@ import AssetGrid from '@/components/dashboard/AssetGrid';
 export default function CollectionView() {
   const params = useParams();
   const router = useRouter();
-  const { collections, boardAssets, fetchBoardAssets, deleteCollection } = useAssetStore();
-  
+  const queryClient = useQueryClient();
+
+  // 1. Fetch all collections to find the current board name/description
+  const { data: collections = [] } = useQuery({
+    queryKey: ['collections'],
+    queryFn: fetchCollections,
+  });
+
   const board = collections.find(c => c.id === params.id);
 
-  useEffect(() => {
-    if (params.id) {
-      fetchBoardAssets(params.id);
+  // 2. Fetch assets for this specific collection
+  const { 
+    data: boardAssets = [], 
+    isLoading: isAssetsLoading 
+  } = useQuery({
+    queryKey: ['collection-assets', params.id],
+    queryFn: () => fetchCollectionAssets(params.id),
+    enabled: !!params.id,
+  });
+
+  // 3. Mutation for deleting
+  const deleteMutation = useMutation({
+    mutationFn: (id) => deleteCollectionApi(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      router.push('/profile');
+    },
+    onError: (error) => {
+      alert(`Failed to delete collection: ${error.message}`);
     }
-  }, [params.id, fetchBoardAssets]);
+  });
+
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete this collection?')) {
+      deleteMutation.mutate(params.id);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-white/10">
@@ -45,13 +73,9 @@ export default function CollectionView() {
 
           <div className="flex items-center gap-2">
             <button 
-              onClick={() => {
-                if(window.confirm('Are you sure you want to delete this collection?')) {
-                  deleteCollection(board.id);
-                  router.push('/profile');
-                }
-              }}
-              className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-red-500 hover:border-red-500/30 hover:bg-red-500/10 transition-all"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-red-500 hover:border-red-500/30 hover:bg-red-500/10 transition-all disabled:opacity-50"
             >
               <Trash2 size={18} />
             </button>

@@ -1,4 +1,3 @@
-import "pretendard/dist/web/static/pretendard.css";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
@@ -7,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TopHeader } from "@/components/top-header";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Providers } from "@/components/providers";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const metadata = {
   title: "Deference - SaaS Dashboard",
@@ -36,15 +37,19 @@ export default function RootLayout({ children }) {
             disableTransitionOnChange
           >
             <TooltipProvider>
-              <SidebarProvider>
-                <AppSidebar />
-                <SidebarInset className="flex flex-col w-full h-screen overflow-hidden">
-                  <TopHeader />
-                  <main className="flex-1 overflow-y-auto bg-background p-0 md:pb-0 pb-[env(safe-area-inset-bottom)]">
-                    {children}
-                  </main>
-                </SidebarInset>
-              </SidebarProvider>
+              <Providers>
+                <SidebarProvider>
+                  <AppSidebar />
+                  <SidebarInset className="flex flex-col w-full h-screen overflow-hidden">
+                    <TopHeader />
+                    <main className="flex-1 overflow-hidden bg-background p-0 md:pb-0 pb-[env(safe-area-inset-bottom)]">
+                      <ScrollArea className="h-full w-full">
+                        {children}
+                      </ScrollArea>
+                    </main>
+                  </SidebarInset>
+                </SidebarProvider>
+              </Providers>
             </TooltipProvider>
           </ThemeProvider>
         </body>

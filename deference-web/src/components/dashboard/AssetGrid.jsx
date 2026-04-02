@@ -19,12 +19,11 @@ const mockAssets = [
   { id: 10, title: "Auth Flow Screens", heightClass: "h-80", source: "uxdesign.cc", url: "#" },
 ];
 
-export default function AssetGrid() {
+export default function AssetGrid({ customAssets, collectionId }) {
   const assets = useAssetStore((state) => state.assets);
   
-  // 현재는 테스트를 위해 mockAssets를 사용
-  // const currentAssets = assets; 
-  const currentAssets = mockAssets; 
+  // Use customAssets if provided, otherwise fallback to store or mock
+  const currentAssets = customAssets || mockAssets; 
 
   // Phase 2: Empty State (빈 화면) 렌더링 로직 (유지되되 디자인 정렬)
   if (currentAssets.length === 0) {
@@ -37,8 +36,8 @@ export default function AssetGrid() {
         <p className="text-muted-foreground mb-6 max-w-sm">
           당신의 영감을 이곳에 저장해 보세요. 시작하려면 새로운 레퍼런스를 추가하세요.
         </p>
-        <Button size="lg" className="rounded-full shadow-md px-8">
-          <Plus className="w-5 h-5 mr-2" /> 
+        <Button size="sm" className="rounded-full shadow-md">
+          <Plus className="w-4 h-4 mr-1.5" /> 
           Add Asset
         </Button>
       </div>
@@ -59,8 +58,8 @@ export default function AssetGrid() {
           <div className="absolute inset-0 bg-black/70 p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between">
             {/* Overlay Top: 우상단 + 버튼 (Rounded Full) */}
             <div className="flex justify-end translate-y-[-10px] group-hover:translate-y-0 transition-transform duration-300">
-              <Button size="icon" variant="ghost" className="w-9 h-9 text-white/90 bg-white/10 hover:bg-white/20 hover:text-white rounded-full transition-all">
-                <Plus className="w-5 h-5" />
+              <Button size="icon-sm" variant="ghost" className="text-white/90 bg-white/10 hover:bg-white/20 hover:text-white rounded-full transition-all">
+                <Plus className="w-4 h-4" />
               </Button>
             </div>
 
@@ -77,8 +76,8 @@ export default function AssetGrid() {
               </div>
               
               {/* 우하단 바로가기 버튼 (Rounded Full) */}
-              <Button size="icon" variant="ghost" className="w-9 h-9 text-white/90 bg-white/10 hover:bg-white/20 hover:text-white rounded-full flex-shrink-0 translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-150">
-                <ArrowUpRight className="w-5 h-5" />
+              <Button size="icon-sm" variant="ghost" className="text-white/90 bg-white/10 hover:bg-white/20 hover:text-white rounded-full flex-shrink-0 translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-150">
+                <ArrowUpRight className="w-4 h-4" />
               </Button>
             </div>
           </div>
