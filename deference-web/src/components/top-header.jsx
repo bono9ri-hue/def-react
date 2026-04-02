@@ -264,16 +264,37 @@ export function TopHeader() {
           <Search className="!h-6 !w-6 text-muted-foreground" />
         </Button>
 
-        <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 min-w-0 shrink transition-all duration-300">
-          <Plus className="!h-6 !w-6 text-muted-foreground" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 min-w-0 shrink transition-all duration-300">
+              <Plus className="!h-6 !w-6 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" side="top" sideOffset={20} className="w-56 border border-border bg-popover shadow-md outline-none focus:outline-none">
+            <DropdownMenuLabel>Upload Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>Upload Files</DropdownMenuItem>
+            <DropdownMenuItem>New Collection</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 min-w-0 shrink transition-all duration-300">
-          <div className="relative">
-            <Bell className="!h-6 !w-6 text-muted-foreground" />
-            <span className="absolute -top-1 -right-1 !h-2.5 !w-2.5 rounded-full bg-red-500 border-2 border-background" />
-          </div>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 min-w-0 shrink transition-all duration-300">
+              <div className="relative">
+                <Bell className="!h-6 !w-6 text-muted-foreground" />
+                <span className="absolute -top-1 -right-1 !h-2.5 !w-2.5 rounded-full bg-red-500 border-2 border-background" />
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" side="top" sideOffset={20} className="w-[300px] border border-border bg-popover shadow-md outline-none focus:outline-none">
+            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              No new notifications
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <Button variant="ghost" size="icon" className="flex-1 max-w-[48px] h-12 rounded-full !ring-0 p-0 min-w-0 shrink transition-all duration-300" onClick={() => setIsProfileOpen(true)}>
           <Avatar className="!h-9 !w-9 shrink-0">
