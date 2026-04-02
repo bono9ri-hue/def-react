@@ -36,7 +36,7 @@ export function TopHeader() {
   const { toggleSidebar } = useSidebar();
   const { isLoaded, isSignedIn, user: clerkUser } = useUser();
   const { signOut } = useClerk();
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [open, setOpen] = React.useState(false);
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
