@@ -3,7 +3,21 @@
 import * as React from "react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Home, Plus, Bell, LogOut, Settings, User, Search, Sun, Moon, Monitor, LayoutGrid, Rows2, Columns2, Columns3, Menu } from "lucide-react";
+import { 
+  Menu, 
+  Search, 
+  Plus, 
+  Bell, 
+  User, 
+  Settings, 
+  LogOut, 
+  Sun, 
+  Moon, 
+  Monitor,
+  MoreHorizontal,
+  Home
+} from "lucide-react";
+import Link from "next/link";
 import { navigationData } from "@/config/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -35,7 +49,7 @@ import {
 export function TopHeader() {
   const { toggleSidebar } = useSidebar();
   const { isLoaded, isSignedIn, user: clerkUser } = useUser();
-  const { signOut } = useClerk();
+  const { openUserProfile, signOut } = useClerk();
   const { theme, setTheme } = useTheme();
   const [open, setOpen] = React.useState(false);
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
@@ -61,8 +75,13 @@ export function TopHeader() {
     <header className="sticky top-0 z-40 flex h-20 w-full items-center justify-between px-4 bg-transparent md:bg-background/95 md:backdrop-blur-sm shrink-0">
       {/* Left Area: Sidebar Toggle (Hamburger Menu) */}
       <div className="flex items-center">
-        <Button variant="ghost" size="icon" className="!h-9 !w-9 rounded-full !ring-0 !outline-none" onClick={toggleSidebar}>
-          <Menu className="h-5 w-5 text-foreground" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] text-white hover:bg-[oklch(0.269_0_0)]/90 hover:text-white !ring-0 !outline-none p-0 transition-colors" 
+          onClick={toggleSidebar}
+        >
+          <Menu className="h-5 w-5" strokeWidth={1.5} />
           <span className="sr-only">Toggle Sidebar</span>
         </Button>
       </div>
@@ -74,7 +93,7 @@ export function TopHeader() {
           className="relative h-9 w-full justify-start rounded-[0.5rem] bg-secondary hover:bg-secondary/80 border border-border text-secondary-foreground shadow-sm sm:pr-12 md:w-full transition-colors !ring-0 !outline-none"
           onClick={() => setOpen(true)}
         >
-          <Search className="w-4 h-4 mr-2" />
+          <Search className="w-4 h-4 mr-2" strokeWidth={1.5} />
           <span className="hidden lg:inline-flex">Search collections and assets...</span>
           <span className="inline-flex lg:hidden">Search...</span>
           <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-6 select-none items-center gap-1 rounded border border-border/50 bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:flex">
@@ -84,13 +103,18 @@ export function TopHeader() {
       </div>
 
       {/* Right Area: Utility Actions (Desktop Only - Decoupled for Blinking Prevention) */}
-      <div className="hidden md:flex items-center gap-2">
+      <div className="hidden md:flex items-center gap-1.5">
         {/* 1. 인증 상태와 무관하게 즉시 렌더링되는 고정 UI (깜빡임 완벽 제거) */}
         {/* [Upload 버튼 (+)] */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button aria-label="Add new space" variant="ghost" size="icon" className="!h-9 !w-9 rounded-full !ring-0 !outline-none focus:!ring-0 focus:!outline-none focus-visible:!ring-0 focus-visible:!outline-none">
-              <Plus className="!h-5 !w-5 text-muted-foreground" />
+            <Button 
+              aria-label="Add new space" 
+              variant="ghost" 
+              size="icon" 
+              className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] text-white hover:bg-[oklch(0.269_0_0)]/90 hover:text-white !ring-0 !outline-none p-0 transition-colors"
+            >
+              <Plus className="!h-5 !w-5" strokeWidth={1.5} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()} className="w-56 border border-border bg-popover shadow-md outline-none focus:outline-none">
@@ -104,8 +128,13 @@ export function TopHeader() {
         {/* [Notification 버튼 (알림 + 빨간점)] */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button aria-label="Notifications" variant="ghost" size="icon" className="relative !h-9 !w-9 rounded-full !ring-0 !outline-none focus:!ring-0 focus:!outline-none focus-visible:!ring-0 focus-visible:!outline-none">
-              <Bell className="!h-5 !w-5 text-muted-foreground" />
+            <Button 
+              aria-label="Notifications" 
+              variant="ghost" 
+              size="icon" 
+              className="relative w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] text-white hover:bg-[oklch(0.269_0_0)]/90 hover:text-white !ring-0 !outline-none p-0 transition-colors"
+            >
+              <Bell className="h-4 w-4" strokeWidth={1.5} />
               <span className="absolute top-[2.5px] right-[2.5px] flex !h-1.5 !w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full !h-1.5 !w-1.5 bg-red-500"></span>
@@ -121,45 +150,22 @@ export function TopHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="w-[1px] h-4 bg-border mx-2" />
-
-        {/* 2. 인증 상태에 따라 동적으로 변하는 유저 UI (Avatar/SignIn) */}
-        {!isLoaded ? (
-          <Skeleton className="h-9 w-9 rounded-full" />
-        ) : isSignedIn ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative !h-9 !w-9 rounded-full p-0 !ring-0 !outline-none focus:!ring-0 focus:!outline-none focus-visible:!ring-0 focus-visible:!outline-none">
-                <Avatar className="h-9 w-9 shrink-0">
-                  <AvatarImage src={clerkUser?.imageUrl} alt={clerkUser?.fullName || "User"} />
-                  <AvatarFallback className="bg-muted animate-pulse" />
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 border border-border bg-popover shadow-md outline-none focus:outline-none">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{clerkUser?.fullName}</p>
-                  <p className="text-xs leading-none text-muted-foreground">{clerkUser?.primaryEmailAddress?.emailAddress}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => signOut()}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+        {/* 2. 뷰 제어 및 설정 버튼 (...) - 아바타 드롭다운 메뉴 이관 */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              aria-label="View Controls & Settings" 
+              variant="ghost" 
+              size="icon" 
+              className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] text-white hover:bg-[oklch(0.269_0_0)]/90 hover:text-white !ring-0 !outline-none p-0 transition-colors"
+            >
+              <MoreHorizontal className="h-5 w-5" strokeWidth={1.5} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 border border-border bg-popover shadow-md outline-none focus:outline-none">
+            <DropdownMenuLabel>View & Settings</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
               <DropdownMenuItem className="flex items-center justify-between py-2 focus:bg-transparent" onSelect={(e) => e.preventDefault()}>
                 <span className="text-sm font-medium">Theme</span>
                 <div className="flex items-center gap-1 rounded-full bg-secondary p-1">
@@ -185,8 +191,45 @@ export function TopHeader() {
                   </button>
                 </div>
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => openUserProfile()}>
+                <User className="mr-2 h-4 w-4" />
+                <span>Manage Account</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>App Settings</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => signOut()} className="text-red-500 focus:text-red-500">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Sign Out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* 3. 유저 아바타 - 클릭 시 즉시 프로필 페이지로 이동 */}
+        {!isLoaded ? (
+          <Skeleton className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full p-0" />
+        ) : isSignedIn ? (
+          <Link href="/profile">
+            <Button 
+              variant="ghost" 
+              className="w-9 h-9 min-w-[2.25rem] min-h-[2.25rem] flex-shrink-0 aspect-square rounded-full bg-[oklch(0.269_0_0)] flex items-center justify-center p-0 focus-visible:ring-0 overflow-hidden relative !ring-0 !outline-none transition-colors"
+            >
+              <Avatar className="w-full h-full shrink-0 rounded-none pointer-events-none">
+                <AvatarImage 
+                  src={clerkUser?.imageUrl} 
+                  alt={clerkUser?.fullName || "User"} 
+                  className="object-cover w-full h-full rounded-full"
+                />
+                <AvatarFallback className="bg-muted animate-pulse" />
+              </Avatar>
+            </Button>
+          </Link>
         ) : (
           <div className="flex items-center gap-2">
             <SignInButton mode="modal">
