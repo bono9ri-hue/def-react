@@ -1,329 +1,427 @@
+/**
+ * Deference Backend Worker (Cloudflare D1)
+ * RESTful API for asset and tag management with CORS.
+ */
+
 export default {
-  async fetch(request, env, ctx) {
-    const rawOrigin = request.headers.get("Origin");
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const method = request.method;
 
-    // [CORS] 허용 도메인 확정 (Strict Matching)
-    const allowedOrigins = [
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-      "http://localhost:3001",
-      "https://www.deference.work",
-      "https://deference.work"
-    ];
-
-    // Origin 매칭 로직: 리스트에 있으면 해당 Origin 사용, 없으면 운영 도메인 기본값
-    let origin = "https://www.deference.work"; 
-    if (rawOrigin && allowedOrigins.includes(rawOrigin)) {
-      origin = rawOrigin;
-    }
-
+    // 1. Global CORS Headers
     const corsHeaders = {
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-      "Access-Control-Allow-Credentials": "true",
-      "Access-Control-Max-Age": "86400",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // 🚀 [OPTIONS] 프리플라이트 요청 최우선 처리 (인증 로직 진입 전)
-    if (request.method === "OPTIONS") {
+    // 2. Immediate OPTIONS Preflight Handling
+    if (method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    // ✨ [표준 응답 헬퍼] 모든 응답에 CORS 및 JSON 헤더 강제 주입
-    const jsonResponse = (data, status = 200) => {
-      return new Response(JSON.stringify(data), {
-        status,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
-      });
-    };
-
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    // 🛡️ [인증] Bearer 토큰 검사
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return jsonResponse({ error: "No Token Provided" }, 401);
-    }
-
-    const sessionToken = authHeader.split(" ")[1];
-
     try {
-      // 🛂 [JWT 디코딩] 유저 아이디 추출 및 패딩 정규화
-      let userId;
-      try {
-        const tokenParts = sessionToken.split('.');
-        if (tokenParts.length < 2) throw new Error("Invalid format");
-        
-        let base64 = tokenParts[1].replace(/-/g, '+').replace(/_/g, '/');
-        const pad = base64.length % 4;
-        if (pad) base64 += '='.repeat(4 - pad);
-        const payloadObj = JSON.parse(atob(base64));
-        userId = payloadObj.sub;
-      } catch (e) {
-        return jsonResponse({ error: "Invalid Token Payload" }, 401);
-      }
-
-      if (!userId) {
-        return jsonResponse({ error: "Invalid User ID" }, 401);
-      }
-
-      // ==========================================
-      // [1] 파일 업로드 (R2) : POST /upload
-      // ==========================================
-      if (path === "/upload" && request.method === "POST") {
+      // 3. POST /assets (Create Asset with 3-Tier Image Upload)
+      if (method === "POST" && url.pathname === "/assets") {
         try {
+          // 1. Safe Multipart/Form-Data Parsing
           const formData = await request.formData();
-          const file = formData.get("file");
-          if (!file) return jsonResponse({ error: "파일이 없습니다." }, 400);
-
-          const arrayBuffer = await file.arrayBuffer();
-          const uniqueId = crypto.randomUUID();
-          const fileName = `uploads/${userId}/${uniqueId}.webp`;
-
-          await env.MY_BUCKET.put(fileName, arrayBuffer, {
-            httpMetadata: { contentType: "image/webp" },
-          });
-
-          const publicUrl = `https://pub-d2476b64512145c0894fe40bd87e4194.r2.dev/${fileName}`;
-          return jsonResponse({ success: true, url: publicUrl, fileName: fileName });
-        } catch (e) {
-          return jsonResponse({ error: "Upload failed: " + e.message }, 500);
-        }
-      }
-
-      // ==========================================
-      // [2] 자산 목록 (D1) : GET /assets
-      // ==========================================
-      if (path === "/assets" && request.method === "GET") {
-        const requestedStatus = url.searchParams.get("status") || "active";
-        const { results } = await env.DB.prepare(
-          "SELECT * FROM assets WHERE user_id = ? AND IFNULL(status, 'active') = ? ORDER BY created_at DESC"
-        ).bind(userId, requestedStatus).all();
-        return jsonResponse(results);
-      }
-
-      // ==========================================
-      // [3] 새 자산 기록 (D1) : POST /assets
-      // ==========================================
-      if (path === "/assets" && request.method === "POST") {
-        const body = await request.json();
-        const query = `
-          INSERT INTO assets (
-            user_id, item_type, image_url, video_url, page_url, 
-            memo, tags, folder, palette_data, created_at, status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'active')
-        `;
-        await env.DB.prepare(query).bind(
-          userId,
-          body.item_type || "image",
-          body.image_url || "",
-          body.video_url || "",
-          body.page_url || "",
-          body.memo || "",
-          body.tags || "",
-          body.folder || "전체",
-          body.palette_data || null
-        ).run();
-        return jsonResponse({ success: true });
-      }
-
-      // ==========================================
-      // [4] 자산 수정 (D1) : PUT /assets
-      // ==========================================
-      if (path === "/assets" && request.method === "PUT") {
-        const body = await request.json();
-        const id = body.id;
-        if (!id) return jsonResponse({ error: "ID 없음" }, 400);
-
-        if (body.memo !== undefined) await env.DB.prepare("UPDATE assets SET memo = ? WHERE id = ? AND user_id = ?").bind(body.memo, id, userId).run();
-        if (body.tags !== undefined) await env.DB.prepare("UPDATE assets SET tags = ? WHERE id = ? AND user_id = ?").bind(body.tags, id, userId).run();
-        if (body.folder !== undefined) await env.DB.prepare("UPDATE assets SET folder = ? WHERE id = ? AND user_id = ?").bind(body.folder, id, userId).run();
-        if (body.palette_data !== undefined) await env.DB.prepare("UPDATE assets SET palette_data = ? WHERE id = ? AND user_id = ?").bind(body.palette_data, id, userId).run();
-        if (body.status !== undefined) await env.DB.prepare("UPDATE assets SET status = ? WHERE id = ? AND user_id = ?").bind(body.status, id, userId).run();
-
-        return jsonResponse({ success: true });
-      }
-
-      // ==========================================
-      // [5] 자산 삭제 (D1 + R2) : DELETE /assets
-      // ==========================================
-      if (path === "/assets" && request.method === "DELETE") {
-        const id = url.searchParams.get("id");
-        const fileName = url.searchParams.get("fileName");
-        if (id) {
-          await env.DB.prepare("DELETE FROM assets WHERE id = ? AND user_id = ?").bind(id, userId).run();
-        }
-        if (fileName && fileName.includes(userId)) {
-          await env.MY_BUCKET.delete(fileName);
-        }
-        return jsonResponse({ success: true });
-      }
-
-      // ==========================================
-      // [6] 컬렉션 관리 (폴더) : /collections
-      // ==========================================
-      if (path === "/collections") {
-        if (request.method === "GET") {
-          const requestedStatus = url.searchParams.get("status") || "active";
-          const { results } = await env.DB.prepare(
-            "SELECT * FROM collections WHERE user_id = ? AND status = ? ORDER BY is_pinned DESC, sort_order ASC, created_at ASC"
-          ).bind(userId, requestedStatus).all();
-          return jsonResponse(results);
-        }
-
-        if (request.method === "POST") {
-          const body = await request.json();
-          const { results: maxResults } = await env.DB.prepare("SELECT MAX(sort_order) as max_order FROM collections WHERE user_id = ?").bind(userId).all();
-          const nextOrder = (maxResults[0].max_order || 0) + 1;
-          await env.DB.prepare("INSERT INTO collections (name, user_id, sort_order, status, created_at) VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)")
-            .bind(body.name || "", userId, nextOrder).run();
-          return jsonResponse({ success: true });
-        }
-
-        if (request.method === "PUT") {
-          const body = await request.json();
-          if (Array.isArray(body)) {
-            const statements = [];
-            for (const item of body) {
-              if (item.sort_order !== undefined) {
-                statements.push(env.DB.prepare("UPDATE collections SET sort_order = ? WHERE id = ? AND user_id = ?").bind(item.sort_order, item.id, userId));
-              }
-              if (item.status !== undefined) {
-                statements.push(env.DB.prepare("UPDATE collections SET status = ? WHERE id = ? AND user_id = ?").bind(item.status, item.id, userId));
-                statements.push(env.DB.prepare("UPDATE assets SET status = ? WHERE collection_id = ? AND user_id = ?").bind(item.status, item.id, userId));
-              }
-            }
-            if (statements.length > 0) await env.DB.batch(statements);
-          } else {
-            const { id, name, is_pinned, status } = body;
-            if (!id) return jsonResponse({ error: "ID 없음" }, 400);
-
-            if (name !== undefined) await env.DB.prepare("UPDATE collections SET name = ? WHERE id = ? AND user_id = ?").bind(name, id, userId).run();
-            if (is_pinned !== undefined) {
-              const pinnedVal = (is_pinned === true || is_pinned === 1 || String(is_pinned) === "true") ? 1 : 0;
-              await env.DB.prepare("UPDATE collections SET is_pinned = ? WHERE id = ? AND user_id = ?").bind(pinnedVal, id, userId).run();
-            }
-            if (status !== undefined) {
-              const validStatus = (status === 'trash' || status === 'active') ? status : 'active';
-              await env.DB.batch([
-                env.DB.prepare("UPDATE collections SET status = ? WHERE id = ? AND user_id = ?").bind(validStatus, id, userId),
-                env.DB.prepare("UPDATE assets SET status = ? WHERE collection_id = ? AND user_id = ?").bind(validStatus, id, userId)
-              ]);
-            }
-          }
-          return jsonResponse({ success: true });
-        }
-
-        if (request.method === "DELETE") {
-          const id = url.searchParams.get("id");
-          if (!id) return jsonResponse({ error: "ID 없음" }, 400);
-          await env.DB.batch([
-            env.DB.prepare("DELETE FROM assets WHERE collection_id = ? AND user_id = ?").bind(id, userId),
-            env.DB.prepare("DELETE FROM collections WHERE id = ? AND user_id = ?").bind(id, userId)
-          ]);
-          return jsonResponse({ success: true });
-        }
-      }
-
-      // ==========================================
-      // [7] 북마크 관리 : /bookmarks
-      // ==========================================
-      if (path === "/bookmarks") {
-        if (request.method === "GET") {
-          const { results } = await env.DB.prepare("SELECT * FROM bookmarks WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC").bind(userId).all();
-          return jsonResponse(results);
-        }
-
-        if (request.method === "POST") {
-          const body = await request.json();
-          const newId = crypto.randomUUID();
-          const { results } = await env.DB.prepare("SELECT MAX(sort_order) as max_order FROM bookmarks WHERE user_id = ?").bind(userId).all();
-          const nextOrder = (results[0].max_order || 0) + 1;
-          const query = `
-            INSERT INTO bookmarks (
-              id, user_id, name, url, icon_type, icon_value, sort_order, icon_scale, 
-              icon_offset_x, icon_offset_y, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-          `;
-          await env.DB.prepare(query).bind(
-            newId, userId, body.name, body.url, body.icon_type, body.icon_value, nextOrder,
-            body.icon_scale || 1.0, body.icon_offset_x || 0, body.icon_offset_y || 0
-          ).run();
-          return jsonResponse({ success: true });
-        }
-
-        if (request.method === "PUT") {
-          const body = await request.json();
-          if (Array.isArray(body)) {
-            const statements = body.map(bm => env.DB.prepare("UPDATE bookmarks SET sort_order = ? WHERE id = ? AND user_id = ?").bind(bm.sort_order, bm.id, userId));
-            await env.DB.batch(statements);
-          } else {
-            const query = `
-              UPDATE bookmarks SET 
-                name = ?, url = ?, icon_type = ?, icon_value = ?, icon_scale = ?, 
-                icon_offset_x = ?, icon_offset_y = ? 
-              WHERE id = ? AND user_id = ?
-            `;
-            await env.DB.prepare(query).bind(
-              body.name, body.url, body.icon_type, body.icon_value, body.icon_scale || 1.0,
-              body.icon_offset_x || 0, body.icon_offset_y || 0, body.id, userId
-            ).run();
-          }
-          return jsonResponse({ success: true });
-        }
-
-        if (request.method === "DELETE") {
-          const id = url.searchParams.get("id");
-          if (id) await env.DB.prepare("DELETE FROM bookmarks WHERE id = ? AND user_id = ?").bind(id, userId).run();
-          return jsonResponse({ success: true });
-        }
-      }
-
-      // ==========================================
-      // [8] 사용자 설정 : /preferences
-      // ==========================================
-      if (path === "/preferences") {
-        if (request.method === "GET") {
-          const result = await env.DB.prepare("SELECT * FROM preferences WHERE user_id = ?").bind(userId).first();
-          return jsonResponse(result || { view_mode: "masonry", masonry_size: 4, grid_size: 6 });
-        }
-
-        if (request.method === "PUT") {
+          const userId = formData.get('userId') || 'anonymous';
+          const type = formData.get('type') || 'image';
+          const metadataStr = formData.get('metadata') || '{}';
+          let metadata = {};
           try {
-            const body = await request.json();
-            const vMode = body.view_mode || body.viewMode || 'masonry';
-            const mSize = body.masonry_size !== undefined ? Number(body.masonry_size) : (Number(body.masonrySize) || 4);
-            const gSize = body.grid_size !== undefined ? Number(body.grid_size) : (Number(body.gridSize) || 6);
+            metadata = JSON.parse(metadataStr);
+          } catch(e) { /* ignore parse error */ }
 
-            const query = `
-              INSERT INTO preferences (user_id, view_mode, masonry_size, grid_size) 
-              VALUES (?, ?, ?, ?) 
-              ON CONFLICT(user_id) DO UPDATE SET 
-                view_mode = excluded.view_mode, masonry_size = excluded.masonry_size, 
-                grid_size = excluded.grid_size, updated_at = CURRENT_TIMESTAMP
-            `;
-            await env.DB.prepare(query).bind(userId, vMode, mSize, gSize).run();
-            return jsonResponse({ success: true });
-          } catch (e) {
-            return jsonResponse({ error: e.message, message: "설정 저장 실패" }, 500);
+          const thumbFile = formData.get('thumb');
+          const displayFile = formData.get('display');
+          const originalFile = formData.get('original');
+
+          if (!originalFile) {
+            return new Response(JSON.stringify({ error: "Missing original file in payload" }), {
+              status: 400, headers: corsHeaders
+            });
           }
+
+          // 2. Prepare R2 Parallel Upload
+          const id = crypto.randomUUID();
+          const fileKey = crypto.randomUUID();
+          
+          const thumbKey = `${fileKey}-thumb.webp`;
+          const displayKey = `${fileKey}-display.webp`;
+          
+          // Preserve extension for original
+          const extMatch = originalFile.name ? originalFile.name.match(/\.[^.]+$/) : null;
+          const ext = extMatch ? extMatch[0] : '';
+          const originalKey = `${fileKey}-original${ext}`;
+
+          const uploadTasks = [];
+          if (thumbFile) {
+            uploadTasks.push(env.MY_BUCKET.put(thumbKey, thumbFile, {
+              httpMetadata: { contentType: thumbFile.type || 'image/webp', cacheControl: 'public, max-age=31536000' }
+            }));
+          }
+          if (displayFile) {
+            uploadTasks.push(env.MY_BUCKET.put(displayKey, displayFile, {
+              httpMetadata: { contentType: displayFile.type || 'image/webp', cacheControl: 'public, max-age=31536000' }
+            }));
+          }
+          uploadTasks.push(env.MY_BUCKET.put(originalKey, originalFile, {
+            httpMetadata: { contentType: originalFile.type, cacheControl: 'public, max-age=31536000' }
+          }));
+
+          // Execute parallel upload to R2
+          await Promise.all(uploadTasks);
+
+          // 3. D1 Database Insertion with accurate 3-Tier keys
+          const cdnUrl = env.CDN_URL || "https://pub-d2476b64512145c0894fe40bd87e4194.r2.dev";
+          
+          const finalThumbUrl = thumbFile ? `${cdnUrl}/${thumbKey}` : null;
+          const finalDisplayUrl = displayFile ? `${cdnUrl}/${displayKey}` : null;
+          const finalOriginalUrl = `${cdnUrl}/${originalKey}`;
+
+          await env.DB.prepare(
+            `INSERT INTO assets (id, user_id, file_key, type, metadata, thumb_url, display_url, original_url) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            id, 
+            userId, 
+            originalKey, 
+            type, 
+            JSON.stringify(metadata),
+            finalThumbUrl,
+            finalDisplayUrl,
+            finalOriginalUrl
+          ).run();
+
+          const newAsset = {
+            id,
+            user_id: userId,
+            file_key: originalKey,
+            type,
+            metadata,
+            thumb_url: finalThumbUrl,
+            display_url: finalDisplayUrl,
+            original_url: finalOriginalUrl,
+            created_at: new Date().toISOString()
+          };
+
+          return new Response(JSON.stringify(newAsset), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (e) {
+          console.error('[Worker POST /assets Error]:', e);
+          return new Response(JSON.stringify({ error: e.message, stack: e.stack }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
         }
       }
 
-      return new Response("Deference Protected API Running 🛡️", { 
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/plain"
+      // 4. GET /assets/:id/download (Proxy Download with Original Filename)
+      const downloadMatch = url.pathname.match(/^\/assets\/([^\/]+)\/download\/?$/);
+      if (method === "GET" && downloadMatch) {
+        try {
+          const assetId = downloadMatch[1];
+          const asset = await env.DB.prepare("SELECT * FROM assets WHERE id = ?").bind(assetId).first();
+          
+          if (!asset || !asset.file_key) {
+            return new Response("Asset not found", { status: 404, headers: corsHeaders });
+          }
+
+          const object = await env.MY_BUCKET.get(asset.file_key);
+          if (!object) {
+            return new Response("File not found in storage", { status: 404, headers: corsHeaders });
+          }
+
+          // Generate safe filename from metadata or fallback
+          let filename = asset.file_key;
+          try {
+            const meta = typeof asset.metadata === 'string' ? JSON.parse(asset.metadata) : (asset.metadata || {});
+            if (meta.originalName) filename = meta.originalName;
+          } catch(e) {}
+
+          const headers = new Headers();
+          object.writeHttpMetadata(headers);
+          headers.set("Access-Control-Allow-Origin", "*");
+          headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+          headers.set("Content-Type", object.httpMetadata.contentType || "application/octet-stream");
+
+          return new Response(object.body, { headers });
+        } catch (e) {
+          return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
         }
+      }
+
+      // 5. GET /assets (List Assets with Tags)
+      if (method === "GET" && url.pathname === "/assets") {
+        const { results } = await env.DB.prepare(`
+          SELECT a.*, 
+          (SELECT GROUP_CONCAT(t.name) FROM tags t 
+           JOIN asset_tags at ON t.id = at.tag_id 
+           WHERE at.asset_id = a.id) as tags 
+          FROM assets a 
+          ORDER BY a.created_at DESC LIMIT 50
+        `).all();
+
+        const formattedResults = results.map((row) => ({
+          ...row,
+          tags: row.tags ? row.tags.split(",") : [],
+          metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata || {}),
+        }));
+
+        return new Response(JSON.stringify(formattedResults), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // 5. POST /assets/:id/tags (Refined Integrity Pipeline)
+      const tagMatch = url.pathname.match(/^\/assets\/([^\/]+)\/tags\/?$/);
+      if (method === "POST" && tagMatch) {
+        const assetId = tagMatch[1];
+        const { name: tagName } = await request.json();
+
+        // 1. Defense: Asset Existence Check
+        const assetExists = await env.DB.prepare("SELECT id FROM assets WHERE id = ?").bind(assetId).first();
+        if (!assetExists) {
+          return new Response(JSON.stringify({ error: "Asset not found in database. Upload may have failed or was deleted." }), {
+            status: 400,
+            headers: corsHeaders
+          });
+        }
+
+        // 2. Tag Core Insertion (INSERT OR IGNORE)
+        const tagId = crypto.randomUUID();
+        await env.DB.prepare("INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)").bind(tagId, tagName).run();
+
+        // 3. Fetch Actual Tag ID (Ensures mapping to existing tag if name matched)
+        const tagRecord = await env.DB.prepare("SELECT * FROM tags WHERE name = ?").bind(tagName).first();
+        if (!tagRecord) throw new Error("Tag retrieval failed after insert attempt.");
+
+        // 4. M:N Join Mapping (Link Asset to Tag)
+        await env.DB.prepare("INSERT OR IGNORE INTO asset_tags (asset_id, tag_id) VALUES (?, ?)").bind(assetId, tagRecord.id).run();
+
+        // Note: No hybrid caching needed as Asset List query uses subqueries for tags.
+        return new Response(JSON.stringify({ success: true, tag: tagRecord }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // --- New Collection Routes ---
+
+      // GET /collections (List Collections + Thumbnail Preview 4 Join)
+      // GET /collections (List Collections + Thumbnail Preview 4 Join)
+      if (method === "GET" && url.pathname === "/collections") {
+        const { results } = await env.DB.prepare(`
+          SELECT c.*, 
+          (SELECT json_group_array(json_object('id', id, 'thumb_url', thumb_url)) FROM (
+            SELECT a.id, a.thumb_url FROM assets a 
+            JOIN collection_assets ca ON a.id = ca.asset_id 
+            WHERE ca.collection_id = c.id 
+            ORDER BY ca.added_at DESC LIMIT 4
+          )) as preview_assets 
+          FROM collections c ORDER BY c.created_at DESC
+        `).all();
+
+        const formattedResults = results.map(col => ({
+          ...col,
+          preview_assets: typeof col.preview_assets === 'string' ? JSON.parse(col.preview_assets) : (col.preview_assets || [])
+        }));
+
+        return new Response(JSON.stringify(formattedResults), { 
+          status: 200, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
+      }
+
+      // POST /collections (Create Collection - Refined with Payload Binding)
+      if (method === "POST" && url.pathname === "/collections") {
+        try {
+          const body = await request.json();
+          const id = crypto.randomUUID();
+          
+          // NOT NULL Defense (Strict Fallback)
+          const userId = body.userId || "anonymous";
+          const name = body.name || "Untitled";
+          const description = body.description || "";
+          const isPublic = body.isPublic ? 1 : 0;
+
+          await env.DB.prepare(
+            "INSERT INTO collections (id, user_id, name, description, is_public) VALUES (?, ?, ?, ?, ?)"
+          ).bind(id, userId, name, description, isPublic).run();
+
+          return new Response(JSON.stringify({ id, name, success: true }), { 
+            status: 200, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          });
+        } catch (error) {
+          console.error("[Worker POST /collections Error]:", error);
+          return new Response(JSON.stringify({ error: error.message }), { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          });
+        }
+      }
+
+      // GET /collections/:id/assets (List Assets in a Collection)
+      const colAssetsMatch = url.pathname.match(/^\/collections\/([^\/]+)\/assets\/?$/);
+      if (method === "GET" && colAssetsMatch) {
+        try {
+          const collectionId = colAssetsMatch[1];
+          const { results } = await env.DB.prepare(
+            "SELECT a.* FROM assets a JOIN collection_assets ca ON a.id = ca.asset_id WHERE ca.collection_id = ? ORDER BY ca.added_at DESC"
+          ).bind(collectionId).all();
+
+          const cdnUrl = env.CDN_URL || "https://pub-d2476b64512145c0894fe40bd87e4194.r2.dev";
+          const formattedResults = results.map((row) => ({
+            ...row,
+            metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata || {}),
+            image_url: row.image_url || (row.file_key ? `${cdnUrl}/${row.file_key}` : null),
+            thumbnail_url: row.thumbnail_url || (row.thumbnail_key ? `${cdnUrl}/${row.thumbnail_key}` : (row.file_key ? `${cdnUrl}/${row.file_key}-thumb.webp` : null)),
+            display_url: row.display_url || (row.display_key ? `${cdnUrl}/${row.display_key}` : (row.file_key ? `${cdnUrl}/${row.file_key}-display.webp` : null)),
+          }));
+
+          return new Response(JSON.stringify(formattedResults), { 
+            status: 200, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          });
+        } catch (e) { 
+          return new Response(JSON.stringify({ error: e.message }), { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }); 
+        }
+      }
+
+      // POST /collections/:id/assets (Add Asset to Collection)
+      const colAssetMatch = url.pathname.match(/^\/collections\/([^\/]+)\/assets\/?$/);
+      if (method === "POST" && colAssetMatch) {
+        const collectionId = colAssetMatch[1];
+        const { assetId } = await request.json();
+        await env.DB.prepare("INSERT OR IGNORE INTO collection_assets (collection_id, asset_id) VALUES (?, ?)")
+          .bind(collectionId, assetId).run();
+        return new Response(JSON.stringify({ success: true }), { 
+          status: 200, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
+      }
+
+      // DELETE /collections/:id (Collection Batch Delete)
+      const colDeleteMatch = url.pathname.match(/^\/collections\/([^\/]+)\/?$/);
+      if (method === "DELETE" && colDeleteMatch) {
+        const collectionId = colDeleteMatch[1];
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM collection_assets WHERE collection_id = ?").bind(collectionId),
+          env.DB.prepare("DELETE FROM collections WHERE id = ?").bind(collectionId)
+        ]);
+        return new Response(JSON.stringify({ success: true }), { 
+          status: 200, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
+      }
+
+      // DELETE /collections/:id/assets/:assetId (Remove Asset from Collection)
+      const colAssetDelMatch = url.pathname.match(/^\/collections\/([^\/]+)\/assets\/([^\/]+)\/?$/);
+      if (method === "DELETE" && colAssetDelMatch) {
+        const collectionId = colAssetDelMatch[1];
+        const assetId = colAssetDelMatch[2];
+        await env.DB.prepare("DELETE FROM collection_assets WHERE collection_id = ? AND asset_id = ?")
+          .bind(collectionId, assetId).run();
+        return new Response(JSON.stringify({ success: true }), { 
+          status: 200, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
+      }
+
+      // GET /assets/:id/collections (List Collections for a Specific Asset)
+      const assetColMatch = url.pathname.match(/^\/assets\/([^\/]+)\/collections\/?$/);
+      if (method === "GET" && assetColMatch) {
+        try {
+          const assetId = assetColMatch[1];
+          const { results } = await env.DB.prepare(
+            "SELECT c.* FROM collections c JOIN collection_assets ca ON c.id = ca.collection_id WHERE ca.asset_id = ? ORDER BY ca.added_at DESC"
+          ).bind(assetId).all();
+          return new Response(JSON.stringify(results), { 
+            status: 200, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          });
+        } catch (e) { 
+          return new Response(JSON.stringify({ error: e.message }), { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }); 
+        }
+      }
+
+      // --- Bookmark Routes ---
+      
+      // 1. GET /bookmarks (List Bookmarks)
+      if (method === "GET" && url.pathname === "/bookmarks") {
+        const { results } = await env.DB.prepare("SELECT * FROM bookmarks ORDER BY order_index ASC, created_at ASC").all();
+        // Return raw results, visibility is handled globally on client
+        return new Response(JSON.stringify(results), { 
+          status: 200, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
+      }
+
+      // 2. POST /bookmarks (Create Bookmark with fallback logic)
+      if (method === "POST" && url.pathname === "/bookmarks") {
+        try {
+          const data = await request.json();
+          let bookmarkUrl = data.url ? data.url.trim() : "";
+          if (bookmarkUrl && !/^https?:\/\//i.test(bookmarkUrl)) bookmarkUrl = `https://${bookmarkUrl}`;
+
+          const id = crypto.randomUUID();
+          const host = new URL(bookmarkUrl).hostname;
+          const faviconUrl = `https://www.google.com/s2/favicons?domain=${host}&sz=64`;
+          
+          // Logic: User custom title > Hostname parsing
+          const finalTitle = data.title && data.title.trim() 
+            ? data.title.trim() 
+            : host.replace("www.", "").split('.')[0].toUpperCase();
+
+          await env.DB.prepare("INSERT INTO bookmarks (id, url, title, favicon_url) VALUES (?, ?, ?, ?)")
+            .bind(id, bookmarkUrl, finalTitle, faviconUrl).run();
+          
+          return new Response(JSON.stringify({ id, url: bookmarkUrl, title: finalTitle, favicon_url: faviconUrl }), { 
+            status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
+        }
+      }
+
+      // 3. DELETE /bookmarks/:id
+      const bookmarkMatch = url.pathname.match(/^\/bookmarks\/([^\/]+)\/?$/);
+      if (method === "DELETE" && bookmarkMatch) {
+        const targetId = bookmarkMatch[1];
+        await env.DB.prepare("DELETE FROM bookmarks WHERE id = ?").bind(targetId).run();
+        return new Response(JSON.stringify({ success: true }), { 
+          status: 200, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        });
+      }
+
+      // 6. 404 Not Found
+      return new Response("Not Found Route: " + method + " " + url.pathname, {
+        status: 404,
+        headers: corsHeaders
       });
 
-    } catch (globalError) {
-      return jsonResponse({ success: false, error: globalError.message }, 500);
+    } catch (error) {
+      console.error("[Worker Error]:", error);
+      return new Response(JSON.stringify({ 
+        error: "Internal Server Error",
+        message: error.message, 
+        stack: error.stack 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
   },
 };

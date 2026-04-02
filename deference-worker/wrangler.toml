@@ -1,15 +1,26 @@
+# ==========================================
+# [SINGLE OPERATION SERVER] 단일 운영 환경
+# 로컬 개발 및 실제 배포가 동일한 D1/R2를 공유합니다.
+# 로컬 실행: npx wrangler dev --remote
+# 배포 실행: npx wrangler deploy
+# ==========================================
 name = "def-api"
 main = "index.js"
-compatibility_date = "2024-03-18"
+compatibility_date = "2024-03-29"
+account_id = "e6d7a02f21b422a76849f2939df3370e"
 
 [vars]
-# 추가적인 환경변수가 필요하다면 여기에 작성합니다.
+ENVIRONMENT = "production"
+R2_BUCKET_NAME = "def-archive"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "def-db"
+database_id = "cef76255-ffc8-4219-ba60-87522ca46c3b" 
 
 [[r2_buckets]]
 binding = "MY_BUCKET"
 bucket_name = "def-archive"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "def-db"
-database_id = "cef76255-ffc8-4219-ba60-87522ca46c3b"
+[triggers]
+crons = ["0 3 * * *"]

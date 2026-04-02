@@ -11,6 +11,11 @@ const nextConfig = {
         protocol: 'http',
         hostname: '**',
       },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '8787',
+      },
     ],
     // "Godly" 속도를 위한 최신 압축 포맷 설정
     formats: ['image/avif', 'image/webp'],

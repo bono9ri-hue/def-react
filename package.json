@@ -7,12 +7,16 @@
     "deference-worker"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w deference-web\" \"npm run dev -w deference-extension\" \"npm run dev -w deference-worker\"",
+    "dev": "concurrently \"npm run dev -w deference-web\" \"npm run dev -w deference-extension\" \"npm run dev -w deference-worker -- --remote\"",
     "web": "npm run dev -w deference-web",
     "ext": "npm run dev -w deference-extension",
-    "worker": "npm run dev -w deference-worker"
+    "worker": "npm run dev -w deference-worker -- --remote"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "@clerk/themes": "^2.4.57",
+    "@google/generative-ai": "^0.24.1"
   }
 }
