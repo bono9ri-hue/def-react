@@ -38,9 +38,9 @@ export default function RootLayout({ children }) {
           >
             <TooltipProvider>
               <Providers>
-                <SidebarProvider>
+                <SidebarProvider defaultOpen={false}>
                   <AppSidebar />
-                  <SidebarInset className="flex flex-col w-full h-screen overflow-hidden">
+                  <SidebarInset className="flex flex-col flex-1 min-h-screen overflow-hidden gap-8 md:gap-12 pt-4 md:pt-6 layout-padding w-full">
                     <TopHeader />
                     <main className="flex-1 overflow-hidden bg-background p-0 md:pb-0 pb-[env(safe-area-inset-bottom)]">
                       <ScrollArea className="h-full w-full">

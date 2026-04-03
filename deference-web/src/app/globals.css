@@ -84,12 +84,19 @@
   --chart-5: oklch(0.269 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --page-padding: 1rem; /* 모바일 기본 여백 (16px) */
+  --layout-v-gap: 1.5rem; /* 세로 섹션 간격 (24px) */
+  --page-padding: 0.75rem; /* 모바일 (12px, Scale 3) */
 }
 
 @media (min-width: 768px) {
   :root {
-    --page-padding: 2rem; /* 태블릿/데스크톱 여백 (32px) */
+    --page-padding: 1.5rem; /* 태블릿/데스크탑 (24px, Scale 6) */
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --page-padding: 2rem; /* 대형 화면 (32px, Scale 8) */
   }
 }
 
@@ -151,5 +158,9 @@
   .layout-padding {
     padding-left: var(--page-padding);
     padding-right: var(--page-padding);
+  }
+
+  .layout-max-width {
+    max-width: 1440px;
   }
 }

@@ -30,13 +30,13 @@ export const navigationData = {
   navMain: [
     {
       title: "All Assets",
-      url: "/dashboard",
+      url: "/home",
       icon: LayoutGrid,
       isActive: true,
     },
     {
       title: "Collections",
-      url: "/dashboard/collections",
+      url: "/home/collections",
       icon: FolderOpen,
       isActive: false,
     },

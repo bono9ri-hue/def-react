@@ -3,12 +3,17 @@
 import { useUser, UserButton } from "@clerk/nextjs";
 import { useQuery } from '@tanstack/react-query';
 import { fetchCollections } from '@/lib/api';
-import { LogOut, Settings, LayoutGrid, ChevronRight } from "lucide-react";
+import { Settings, LayoutGrid, ArrowLeft, Lock } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import Link from 'next/link';
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarImage, AvatarFallback, AvatarGroup } from "@/components/ui/avatar";
 
 /**
  * Profile & Boards Index Page
- * Integrates Clerk user data and D1 collection data for a unified management view.
+ * Figma-style Decoupled Meta Layout for high-density collection management.
  */
 export default function ProfilePage() {
   const { user, isLoaded: isUserLoaded } = useUser();
@@ -22,114 +27,167 @@ export default function ProfilePage() {
     queryFn: fetchCollections,
   });
 
-  const isLoaded = isUserLoaded && !isCollectionsLoading;
-
   if (isError) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-white/40">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center text-muted-foreground gap-4">
         <p>Failed to load collections. Please try again later.</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
       </div>
     );
   }
 
+  // Loading State with Skeletons matching the new 1:1 + Meta structure
   if (!isUserLoaded || (isCollectionsLoading && !collections.length)) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-white/20 border-t-white/80 rounded-full animate-spin" />
+      <div className="min-h-screen bg-background layout-padding pt-[var(--layout-v-gap)]">
+        <div className="space-y-12">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Skeleton className="w-12 h-12 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-9 w-9 rounded-md" />
+            </div>
+          </div>
+          <Separator className="opacity-50" />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 md:gap-6">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="flex flex-col gap-3">
+                <Skeleton className="aspect-[5/4] w-full rounded-none" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
-  const CDN_BASE = process.env.NEXT_PUBLIC_CDN_URL;
-
   return (
-    <div className="min-h-screen bg-black text-white layout-padding py-10 selection:bg-white/10">
+    <div className="min-h-screen bg-background text-foreground pt-[var(--layout-v-gap)] pb-20 selection:bg-primary/10 w-full">
       {/* Header Container */}
-      <div className="max-w-6xl mx-auto">
-        <header className="flex items-center justify-between mb-16">
-          <div className="flex items-center gap-4">
-            <UserButton appearance={{ elements: { userButtonAvatarBox: "w-12 h-12" } }} />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white">{user?.fullName || 'User Profile'}</h1>
-              <p className="text-white/40 text-sm">{user?.primaryEmailAddress?.emailAddress}</p>
-            </div>
+      <header className="flex items-center justify-between mb-12">
+        <div className="flex items-center gap-4">
+          <div className="relative group/avatar transition-transform hover:scale-105 duration-300">
+            <UserButton appearance={{ elements: { userButtonAvatarBox: "w-12 h-12 shadow-sm" } }} />
           </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">{user?.fullName || 'User Profile'}</h1>
+            <p className="text-muted-foreground text-xs font-medium">{user?.primaryEmailAddress?.emailAddress}</p>
+          </div>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <Link 
-              href="/"
-              className="px-6 py-2.5 bg-white/5 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
-            >
-              Back to Gallery
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" asChild className="hidden sm:inline-flex">
+            <Link href="/">
+              <Icon name={ArrowLeft} size="sm" className="mr-2" />
+              Back to Dashboard
             </Link>
-            <button className="p-3 bg-white/5 border border-white/10 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all">
-              <Settings size={20} />
-            </button>
-          </div>
-        </header>
+          </Button>
+          <Button variant="outline" size="icon-sm">
+            <Icon name={Settings} size="sm" />
+          </Button>
+        </div>
+      </header>
 
-        {/* Collections Section */}
-        <div className="pt-12 border-t border-white/5">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xl font-medium tracking-tight">My Collections</h2>
-            <span className="text-[10px] text-white/20 uppercase tracking-[0.2em] font-bold">
+      {/* Collections Section */}
+      <section className="space-y-8">
+        <Separator className="opacity-50" />
+        
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">My Collections</h2>
+            <p className="text-xs text-muted-foreground font-medium">Manage your personal moodboards and references</p>
+          </div>
+          <div className="px-3 py-1 bg-secondary rounded-full border border-border shadow-sm">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-foreground">
               {collections.length} Total
             </span>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {collections.map((col) => (
-              <Link
-                key={col.id}
-                href={`/collections/${col.id}`}
-                className="aspect-[4/5] bg-[#0A0A0A] border border-white/5 rounded-[32px] p-6 flex flex-col hover:border-white/20 transition-all cursor-pointer group relative overflow-hidden shadow-2xl"
-              >
-                {/* Thumbnail Grid */}
-                <div className="aspect-[4/3] bg-[#141414] rounded-2xl p-2 mb-4 border border-white/5 group-hover:border-white/20 transition-colors overflow-hidden">
-                  <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-1 rounded-xl overflow-hidden">
-                    {[0, 1, 2, 3].map(i => {
-                      const assets = col.preview_assets || [];
-                      const asset = assets[i];
-                      return (
-                        <div key={i} className="bg-white/5 w-full h-full relative">
-                          {asset?.thumb_url && <img src={asset.thumb_url} alt="preview" className="w-full h-full object-cover" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="relative z-10 flex items-center justify-between mt-auto">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">
-                      {col.name}
-                    </h3>
-                    <p className="text-[10px] text-white/20 uppercase tracking-widest font-bold">
-                      {col.asset_count || 0} Assets
-                    </p>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all">
-                    <ChevronRight size={14} className="text-white/40" />
-                  </div>
-                </div>
-              </Link>
-            ))}
-
-            {/* Empty State / Create Board Suggestion */}
-            {collections.length === 0 && (
-              <div className="col-span-full py-20 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-3xl bg-white/[0.01]">
-                <p className="text-white/20 text-[10px] uppercase tracking-[0.3em] font-bold">No boards created yet</p>
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Footer Meta */}
-        <div className="mt-20 pt-8 border-t border-white/5 flex justify-between items-center text-[9px] text-white/10 uppercase tracking-widest font-bold">
-          <span>Deference ID: {user?.id.slice(0, 12)}</span>
-          <span>Version 1.2.0</span>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 md:gap-6">
+            {collections.map((col) => {
+              const previewAsset = col.preview_assets?.[0];
+              return (
+                <div key={col.id} className="flex flex-col gap-3 group cursor-pointer">
+                  {/* Thumbnail Area - Pure 1:1 with Hover Scale */}
+                  <Link
+                    href={`/collections/${col.id}`}
+                    className="block relative aspect-[5/4] w-full overflow-hidden rounded-none bg-muted border border-border/50 group-hover:border-foreground/20 transition-all duration-300 shadow-sm"
+                  >
+                    {previewAsset?.thumb_url ? (
+                      <img 
+                        src={previewAsset.thumb_url} 
+                        alt={col.name} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-muted/50">
+                        <Icon name={LayoutGrid} size="lg" className="text-muted/20" />
+                      </div>
+                    )}
+                  </Link>
+                  
+                  {/* Decoupled Metadata Area - Figma style */}
+                  <div className="flex flex-col gap-1.5 px-0.5">
+                    <div className="flex justify-between items-start gap-2">
+                       <h3 className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                        {col.name}
+                       </h3>
+                       {col.visibility === 'private' && (
+                         <Icon name={Lock} size="xs" className="text-muted-foreground shrink-0 mt-0.5" />
+                       )}
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-[11px] text-muted-foreground font-medium tracking-tight">
+                      <div className="flex items-center gap-1.5 opacity-80">
+                        <span>{col.asset_count || 0} Items</span>
+                        <span className="text-muted-foreground/30">•</span>
+                        <span>2h ago</span>
+                      </div>
+                      <AvatarGroup>
+                        <Avatar size="sm" className="size-5">
+                          <AvatarImage src={user?.imageUrl} />
+                          <AvatarFallback className="text-[8px] bg-secondary">{user?.firstName?.[0]}</AvatarFallback>
+                        </Avatar>
+                      </AvatarGroup>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+          {/* Empty State */}
+          {collections.length === 0 && (
+            <div className="col-span-full py-32 flex flex-col items-center justify-center border border-dashed border-border rounded-[32px] bg-muted/10 space-y-3">
+              <Icon name={LayoutGrid} size="lg" className="text-muted/30" />
+              <p className="text-muted-foreground text-[10px] uppercase tracking-[0.2em] font-bold">No collections found</p>
+              <Button variant="outline" size="sm" asChild className="mt-2">
+                 <Link href="/">Browse Gallery</Link>
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
+      </section>
+
+      {/* Footer Meta */}
+      <footer className="mt-24 pt-8 border-t border-border/50 flex justify-between items-center text-[9px] text-muted-foreground/40 uppercase tracking-[0.2em] font-bold">
+        <div className="flex gap-4">
+          <span>ID: {user?.id.slice(0, 12)}</span>
+          <Separator orientation="vertical" className="h-3" />
+          <span>Standard View</span>
+        </div>
+        <span>v1.2.0</span>
+      </footer>
     </div>
   );
 }

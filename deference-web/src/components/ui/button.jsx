@@ -21,12 +21,14 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4 py-2 text-sm", // 40px: 데스크톱 기본 규격 및 서브 액션
-        sm: "h-8 px-3 text-xs",            // 32px: 테이블/카드 내부 등 밀도 높은 UI용
-        lg: "h-12 px-8 text-base",         // 48px: 모바일 터치 최적화 및 주요 CTA 버튼
-        icon: "h-10 w-10",                 // 40x40px: 기본 아이콘 버튼
-        "icon-sm": "h-8 w-8",              // 32x32px: 작은 아이콘 버튼
-        "icon-lg": "h-12 w-12",            // 48x48px: 모바일 타겟용 큰 아이콘 버튼
+        default: "h-10 px-4 py-2 text-sm", // 40px (기준)
+        sm: "h-9 px-4 text-sm",            // 36px (서브)
+        xs: "h-8 px-3 text-xs",            // 32px (고밀도)
+        lg: "h-12 px-8 text-base",         // 48px (CTA / 터치 최적화)
+        icon: "h-10 w-10",                 // 40px 아이콘
+        "icon-sm": "h-9 w-9",              // 36px 아이콘
+        "icon-xs": "h-8 w-8",              // 32px 아이콘
+        "icon-lg": "h-12 w-12",            // 48px 아이콘
       },
     },
     defaultVariants: {
