@@ -36,7 +36,9 @@ export default function AssetGrid({ customAssets, collectionId }) {
 
   const currentAssets = customAssets || fetchedAssets || [];
 
-  const handleOpenDetail = (id) => {
+  const handleOpenDetail = (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
     const params = new URLSearchParams(searchParams.toString());
     params.set("asset", id);
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
@@ -100,7 +102,7 @@ export default function AssetGrid({ customAssets, collectionId }) {
       {currentAssets.map((asset) => (
         <div 
           key={asset.id} 
-          onClick={() => handleOpenDetail(asset.id)}
+          onClick={(e) => handleOpenDetail(e, asset.id)}
           className="break-inside-avoid mb-3 group relative cursor-pointer overflow-hidden rounded-none border border-border/40 bg-muted/20"
         >
           {/* 1. Item Skeleton Placeholder (Always present as background) */}
