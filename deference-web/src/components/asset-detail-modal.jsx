@@ -24,12 +24,13 @@ import useAssetStore from "@/store/useAssetStore";
 
 /**
  * AssetDetailModal
- * Behance-Style Floating Layout.
- * Transparent full-screen overlay with a separate Action Card.
+ * Responsive Hybrid UI: Desktop Studio Lightbox vs Mobile Peek Drawer.
+ * Pure CSS Transits + Zustand State Management.
  */
 export function AssetDetailModal() {
   const selectedAssetId = useAssetStore((state) => state.selectedAssetId);
   const setSelectedAssetId = useAssetStore((state) => state.setSelectedAssetId);
+  const [isMobileExpanded, setIsMobileExpanded] = React.useState(false);
 
   // (0) Data Fetching
   const { data: currentAssets = [] } = useQuery({
@@ -80,6 +81,7 @@ export function AssetDetailModal() {
   const handleOpenChange = (open) => {
     if (!open) {
       setSelectedAssetId(null);
+      setIsMobileExpanded(false); // Reset mobile state on close
     }
   };
 
@@ -88,51 +90,85 @@ export function AssetDetailModal() {
   return (
     <Dialog open={!!selectedAssetId} onOpenChange={handleOpenChange}>
       <DialogPortal>
-        {/* Step 1: Neutralize Global Overlay to prevent pollution */}
+        {/* Step 1: Backdrop Rollback Protection */}
         <DialogOverlay className="bg-transparent backdrop-blur-none" />
         
-        {/* Full-Screen Transparent Stage */}
+        {/* Full-Screen Stage */}
         <DialogContent 
           showCloseButton={false} 
-          className="!max-w-none !w-screen !h-screen !p-0 !m-0 !top-0 !left-0 !translate-x-0 !translate-y-0 bg-transparent border-none shadow-none ring-0 flex flex-row items-stretch outline-none overflow-hidden"
+          className="!max-w-none !w-screen !h-screen !p-0 !m-0 !top-0 !left-0 !translate-x-0 !translate-y-0 bg-transparent border-none shadow-none ring-0 flex flex-col md:!flex-row items-stretch outline-none overflow-hidden"
         >
-          {/* Step 2: Dedicated High-Blur Background Layer (Local Control) */}
+          {/* Step 2: Immersive Background (Local Control) */}
           <div 
-            className="fixed inset-0 z-0 bg-black/80 backdrop-blur-xl transition-all duration-500 animate-in fade-in" 
+            className="fixed inset-0 z-0 bg-black/85 backdrop-blur-xl transition-all duration-700" 
             aria-hidden="true" 
             onClick={() => setSelectedAssetId(null)} 
           />
 
-          {/* A11y: Title & Description (Visual-Hidden) */}
-          <DialogTitle className="sr-only">에셋 상세 보기</DialogTitle>
-          <DialogDescription className="sr-only">에셋 상세 정보 및 다운로드 패널</DialogDescription>
+          {/* A11y Requirement: Visual-Hidden Header */}
+          <DialogTitle className="sr-only">에셋 상세 브라우저</DialogTitle>
+          <DialogDescription className="sr-only">에셋의 원본 감상 및 상세 데이터 패널입니다.</DialogDescription>
 
-          {/* Left Section: Immersive Image Stage (Elevated z-index) */}
+          {/* Left/Main Section: Immersive Viewer */}
           <div 
-            className="relative z-10 flex-1 h-full flex items-center justify-center p-8 cursor-zoom-out animate-in fade-in duration-300 ease-out"
+            className="relative z-10 flex-1 h-full flex items-center justify-center p-4 md:p-8 cursor-zoom-out animate-in fade-in duration-500"
             onClick={() => setSelectedAssetId(null)}
           >
             {asset ? (
               <img
                 src={asset.display_url || asset.original_url}
                 alt={asset.metadata?.originalName || "Asset"}
-                onClick={(e) => e.stopPropagation()} // Prevent close when clicking image
-                className="max-w-full max-h-full object-contain drop-shadow-[0_0_50px_rgba(0,0,0,0.6)] cursor-default animate-in fade-in zoom-in-[0.98] duration-300 ease-out"
+                onClick={(e) => e.stopPropagation()} 
+                className="max-w-full max-h-full object-contain drop-shadow-[0_0_60px_rgba(0,0,0,0.7)] cursor-default animate-in fade-in zoom-in-[0.98] duration-500 ease-out"
               />
             ) : (
-              <div className="flex flex-col items-center gap-3 text-white/30">
-                <div className="animate-spin rounded-full h-7 w-7 border-2 border-white/5 border-t-white/40" />
+              <div className="flex flex-col items-center gap-3 text-white/20">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/5 border-t-white/40" />
               </div>
             )}
           </div>
 
-          {/* Right Section: Separate Floating Card (Elevated z-index) */}
+          {/* Right Section: Hybrid Mobile Drawer / Desktop Action Card */}
           <div 
-            className="relative z-10 w-[400px] shrink-0 bg-background h-[calc(100vh-2rem)] my-4 mr-4 rounded-2xl shadow-2xl border border-border flex flex-col p-8 overflow-y-auto cursor-default animate-in slide-in-from-right-8 fade-in duration-500 ease-out scrollbar-hide"
+            className={`
+              /* General */
+              relative z-20 flex flex-col bg-background shadow-2xl border-border cursor-default
+              transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
+              
+              /* Mobile Specific: Peek-a-boo Drawer */
+              fixed bottom-0 left-0 right-0 rounded-t-[32px] border-t
+              ${isMobileExpanded ? 'translate-y-0 h-[80vh]' : 'translate-y-[calc(100%-85px)] h-[80vh]'}
+              
+              /* Desktop Specific: Floating Studio Card */
+              md:relative md:translate-y-0 md:h-[calc(100vh-2rem)] md:w-[400px] md:my-4 md:mr-4 md:rounded-2xl md:border md:shrink-0
+            `}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Action Bar (Top) */}
-            <div className="flex items-center justify-end mb-6">
+            {/* Mobile-Only Drag Pill & Information Peek */}
+            <div 
+              className="md:hidden flex flex-col items-center pt-3 pb-4 cursor-pointer active:bg-muted/10 transition-colors"
+              onClick={() => setIsMobileExpanded(!isMobileExpanded)}
+            >
+              <div className="w-12 h-1.5 bg-muted-foreground/20 rounded-full mb-3" />
+              {!isMobileExpanded && (
+                <div className="flex items-center gap-3 px-6 w-full animate-in fade-in slide-in-from-bottom-1">
+                  <Badge variant="secondary" className="px-1.5 py-0 text-[9px] font-bold h-4">
+                    {asset?.type?.split('/')?.[1]?.toUpperCase() || 'BIN'}
+                  </Badge>
+                  <p className="text-[13px] font-bold truncate text-foreground/80 flex-1">
+                    {asset?.metadata?.originalName || asset?.file_key || "이름 없는 에셋"}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Action Bar / Mobile Expandable Header */}
+            <div className="flex items-center justify-between px-8 pt-4 md:pt-8 mb-6">
+              <div className="hidden md:block">
+                <Badge variant="secondary" className="rounded-none bg-muted text-[10px] font-bold uppercase tracking-widest px-2 py-0.5">
+                  {asset?.type?.split('/')?.[1] || 'Object'}
+                </Badge>
+              </div>
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -143,83 +179,89 @@ export function AssetDetailModal() {
               </Button>
             </div>
 
-            {/* Header: File Name & Type */}
-            <div className="space-y-2 mb-8">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider h-5">
-                  {asset?.type?.split('/')?.[1] || 'FILE'}
-                </Badge>
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">에셋 상세 정보</span>
+            {/* Scrollable Content (Visible on Desktop or when Mobile Expanded) */}
+            <div className={`
+              flex-1 flex flex-col gap-8 px-8 pb-8 
+              ${(isMobileExpanded || window.innerWidth >= 768) ? 'overflow-y-auto' : 'overflow-hidden'}
+              scrollbar-hide
+            `}>
+              {/* Header Info */}
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold tracking-tight leading-tight text-foreground">
+                  {asset?.metadata?.originalName || asset?.file_key || "Untitled File"}
+                </h2>
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  에셋 상세 명세 및 원본 리소스
+                  <span className="w-1 h-1 rounded-full bg-border" />
+                  {asset?.type || "unknown/format"}
+                </p>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight leading-tight text-foreground">
-                {asset?.metadata?.originalName || asset?.file_key || "이름 없는 파일"}
-              </h2>
+
+              {/* Functional Actions */}
+              <div className="grid grid-cols-1 gap-2.5">
+                <Button asChild className="w-full font-bold h-12 shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all" size="lg">
+                  <a href={asset?.original_url} target="_blank" rel="noopener noreferrer" download>
+                    <Download className="w-4 h-4 mr-2.5" strokeWidth={2.5} />
+                    원본 데이터 다운로드
+                  </a>
+                </Button>
+                <Button variant="outline" asChild className="w-full font-bold h-12 border-border/60 hover:bg-muted" size="lg">
+                  <a href={asset?.original_url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-4 h-4 mr-2.5" />
+                    새 탭에서 원본 확인
+                  </a>
+                </Button>
+              </div>
+
+              {/* Data Grid (Form Style) */}
+              <div className="space-y-6 pt-6 border-t border-border/10">
+                <div className="space-y-2.5">
+                  <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em] ml-1">Ingested On</label>
+                  <div className="flex items-center gap-3.5 p-4 rounded-xl border bg-muted/20">
+                    <Calendar className="w-4.5 h-4.5 text-primary/40 shrink-0" />
+                    <span className="text-[13px] font-bold text-foreground/80">
+                      {asset ? new Date(asset.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : "--"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em] ml-1">Technical Spec</label>
+                  <div className="flex items-center gap-3.5 p-4 rounded-xl border bg-muted/20">
+                    <Maximize2 className="w-4.5 h-4.5 text-primary/40 shrink-0" />
+                    <span className="text-[13px] font-bold text-foreground/80">
+                      {asset?.metadata?.dimensions 
+                        ? `${asset.metadata.dimensions.width} × ${asset.metadata.dimensions.height} px`
+                        : asset?.metadata?.size ? `${(asset.metadata.size / 1024 / 1024).toFixed(2)} MB` : "--"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em] ml-1">Internal Reference ID</label>
+                  <div className="flex items-center gap-3.5 p-4 rounded-xl border bg-muted/20 overflow-hidden">
+                    <FileText className="w-4.5 h-4.5 text-primary/40 shrink-0" />
+                    <span className="text-[11px] font-mono text-muted-foreground/60 truncate">
+                      {asset?.id || "--"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Taxonomies */}
+              {asset?.tags?.length > 0 && (
+                <div className="mt-auto pt-8 border-t border-border/10">
+                  <label className="block text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em] mb-4 ml-1">Classification Tokens</label>
+                  <div className="flex flex-wrap gap-2">
+                    {asset.tags.map(t => (
+                      <Badge key={t} variant="outline" className="px-3 py-1 text-[11px] font-bold border-border/60 hover:bg-muted text-muted-foreground/80 hover:text-foreground transition-all uppercase">
+                        {t}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-
-            {/* Action Stack */}
-            <div className="grid grid-cols-1 gap-2 mb-10">
-              <Button asChild className="w-full font-bold h-12 shadow-md" size="lg">
-                <a href={asset?.original_url} target="_blank" rel="noopener noreferrer" download>
-                  <Download className="w-4 h-4 mr-2" strokeWidth={2.5} />
-                  원본 고해상도 다운로드
-                </a>
-              </Button>
-              <Button variant="outline" asChild className="w-full font-medium h-12 border-border/60" size="lg">
-                <a href={asset?.original_url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  새 창에서 원본 보기
-                </a>
-              </Button>
-            </div>
-
-            {/* Metadata (Shadcn Form/Label Style) */}
-            <div className="space-y-8 flex-1">
-              <div className="space-y-3">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">등록 일자</label>
-                <div className="flex items-center gap-3 p-4 rounded-xl border bg-muted/20">
-                  <Calendar className="w-4 h-4 text-primary/60" />
-                  <span className="text-sm font-semibold">
-                    {asset ? new Date(asset.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : "-"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">파일 규격 및 사양</label>
-                <div className="flex items-center gap-3 p-4 rounded-xl border bg-muted/20">
-                  <Maximize2 className="w-4 h-4 text-primary/60" />
-                  <span className="text-sm font-semibold">
-                    {asset?.metadata?.dimensions 
-                      ? `${asset.metadata.dimensions.width} × ${asset.metadata.dimensions.height} px`
-                      : asset?.metadata?.size ? `${(asset.metadata.size / 1024 / 1024).toFixed(2)} MB` : "-"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">시스템 고유 식별자</label>
-                <div className="flex items-center gap-3 p-4 rounded-xl border bg-muted/20 overflow-hidden">
-                  <FileText className="w-4 h-4 text-primary/60 shrink-0" />
-                  <span className="text-[11px] font-mono text-muted-foreground truncate">
-                    {asset?.id || "-"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tags (Bottom) */}
-            {asset?.tags?.length > 0 && (
-              <div className="mt-10 pt-8 border-t border-border/50">
-                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">분류 태그</label>
-                <div className="flex flex-wrap gap-2">
-                  {asset.tags.map(t => (
-                    <Badge key={t} variant="outline" className="px-3 py-1 text-[11px] font-medium border-border/60 hover:bg-muted transition-colors">
-                      {t}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </DialogContent>
       </DialogPortal>
