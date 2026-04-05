@@ -88,21 +88,28 @@ export function AssetDetailModal() {
   return (
     <Dialog open={!!selectedAssetId} onOpenChange={handleOpenChange}>
       <DialogPortal>
-        {/* Custom Darkened Overlay with Heavy Blur */}
-        <DialogOverlay className="bg-black/80 backdrop-blur-md" />
+        {/* Step 1: Neutralize Global Overlay to prevent pollution */}
+        <DialogOverlay className="bg-transparent backdrop-blur-none" />
         
-        {/* Full-Screen Transparent Container */}
+        {/* Full-Screen Transparent Stage */}
         <DialogContent 
           showCloseButton={false} 
-          className="!max-w-none !w-screen !h-screen !p-0 !m-0 !top-0 !left-0 !translate-x-0 !translate-y-0 bg-transparent border-none shadow-none ring-0 flex flex-row items-stretch outline-none"
+          className="!max-w-none !w-screen !h-screen !p-0 !m-0 !top-0 !left-0 !translate-x-0 !translate-y-0 bg-transparent border-none shadow-none ring-0 flex flex-row items-stretch outline-none overflow-hidden"
         >
+          {/* Step 2: Dedicated High-Blur Background Layer (Local Control) */}
+          <div 
+            className="fixed inset-0 z-0 bg-black/80 backdrop-blur-xl transition-all duration-500 animate-in fade-in" 
+            aria-hidden="true" 
+            onClick={() => setSelectedAssetId(null)} 
+          />
+
           {/* A11y: Title & Description (Visual-Hidden) */}
           <DialogTitle className="sr-only">에셋 상세 보기</DialogTitle>
           <DialogDescription className="sr-only">에셋 상세 정보 및 다운로드 패널</DialogDescription>
 
-          {/* Left Section: Immersive Image Stage (Click Backdrop to Close) */}
+          {/* Left Section: Immersive Image Stage (Elevated z-index) */}
           <div 
-            className="flex-1 h-full flex items-center justify-center p-8 cursor-zoom-out animate-in fade-in duration-300 ease-out"
+            className="relative z-10 flex-1 h-full flex items-center justify-center p-8 cursor-zoom-out animate-in fade-in duration-300 ease-out"
             onClick={() => setSelectedAssetId(null)}
           >
             {asset ? (
@@ -119,9 +126,9 @@ export function AssetDetailModal() {
             )}
           </div>
 
-          {/* Right Section: Separate Floating Card (Shadcn Style) */}
+          {/* Right Section: Separate Floating Card (Elevated z-index) */}
           <div 
-            className="w-[400px] shrink-0 bg-background h-[calc(100vh-2rem)] my-4 mr-4 rounded-2xl shadow-2xl border border-border flex flex-col p-8 overflow-y-auto cursor-default animate-in slide-in-from-right-8 fade-in duration-500 ease-out scrollbar-hide"
+            className="relative z-10 w-[400px] shrink-0 bg-background h-[calc(100vh-2rem)] my-4 mr-4 rounded-2xl shadow-2xl border border-border flex flex-col p-8 overflow-y-auto cursor-default animate-in slide-in-from-right-8 fade-in duration-500 ease-out scrollbar-hide"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Action Bar (Top) */}
