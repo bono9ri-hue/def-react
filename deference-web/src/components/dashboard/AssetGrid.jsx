@@ -92,19 +92,19 @@ export default function AssetGrid({ customAssets, collectionId }) {
           <div className="absolute inset-0 bg-muted/30 animate-pulse pointer-events-none" />
 
           {/* 2. Asset Image Layer */}
-          <div className="relative w-full overflow-hidden min-h-[140px] flex items-center justify-center bg-muted/10">
+          <div className="relative w-full overflow-hidden bg-muted/10">
             <img 
               src={asset.original_url || asset.image_url} 
               alt={asset.metadata?.originalName || "Asset"} 
-              className="relative z-10 w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105"
+              className="relative z-10 w-full h-auto block object-cover transition-transform duration-700 group-hover:scale-105"
               loading="lazy"
             />
             {/* Fallback Icon if Image doesn't load/exist */}
-            <ImageIcon className="absolute w-8 h-8 text-muted-foreground/10" />
+            <ImageIcon className="absolute inset-0 m-auto w-8 h-8 text-muted-foreground/10" />
           </div>
 
           {/* Hover Overlay Layer (Premium Design - High Visibility) */}
-          <div className="absolute inset-0 z-20 bg-black/60 p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between rounded-none will-change-opacity">
+          <div className="absolute inset-0 z-20 bg-black/60 p-4 hidden sm:flex flex-col justify-between opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300 rounded-none pointer-events-none sm:group-hover:pointer-events-auto will-change-opacity">
             {/* Overlay Top: [우상단] Quick Action (Plus Button) */}
             <div className="flex justify-end">
               <Button 
