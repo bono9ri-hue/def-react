@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { getUploadUrl, saveAsset } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { processImage } from "@/utils/imageProcessor";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,57 +83,59 @@ export function TopHeader() {
     e.target.value = '';
 
     files.forEach(async (file) => {
-      const toastId = toast.loading(`Uploading ${file.name}...`, {
-        description: "Preparing secure ingestion pipeline",
+      const toastId = toast.loading(`Processing ${file.name}...`, {
+        description: "Generating multi-resolution assets",
       });
 
       try {
-        // Step 1: Get Presigned URL
-        const { uploadUrl, fileKey, id } = await getUploadUrl(file.name, file.type);
+        // Step 1: Client-side Image Processing (Thumb/Display/Original)
+        const { thumb, display, original } = await processImage(file);
         
-        // Step 2: Direct R2 Stream
-        toast.loading(`Uploading ${file.name}...`, {
+        // Step 2: Parallel Request for 3 Presigned URLs
+        const [origUrlRes, thumbUrlRes, dispUrlRes] = await Promise.all([
+          getUploadUrl(file.name, file.type),
+          getUploadUrl(`thumb_${file.name}`, thumb.type || "image/webp"),
+          getUploadUrl(`display_${file.name}`, display.type || "image/webp")
+        ]);
+
+        // Step 3: Parallel R2 Direct Streaming
+        toast.loading(`Streaming ${file.name} (3-stage)...`, {
           id: toastId,
-          description: "Streaming directly to R2 Cloud",
+          description: "Concurrent multi-resolution ingestion",
         });
 
-        const uploadRes = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
+        await Promise.all([
+          fetch(origUrlRes.uploadUrl, { method: "PUT", body: original, headers: { "Content-Type": file.type } }),
+          fetch(thumbUrlRes.uploadUrl, { method: "PUT", body: thumb, headers: { "Content-Type": thumb.type || "image/webp" } }),
+          fetch(dispUrlRes.uploadUrl, { method: "PUT", body: display, headers: { "Content-Type": display.type || "image/webp" } })
+        ]);
 
-        if (!uploadRes.ok) throw new Error("R2 Ingestion Failed");
-
-        // Step 3: D1 Metadata Commit
-        toast.loading(`Uploading ${file.name}...`, {
-          id: toastId,
-          description: "Finalizing metadata and indexing",
-        });
-
+        // Step 4: Atomic D1 Metadata Commit
+        const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL || "https://pub-d2476b64512145c0894fe40bd87e4194.r2.dev";
         await saveAsset({
-          id,
+          id: origUrlRes.id,
           userId: user.id,
-          fileKey,
-          tags: [], // No tags in zero-friction mode
+          fileKey: origUrlRes.fileKey,
+          thumbUrl: `${cdnUrl}/${thumbUrlRes.fileKey}`,
+          displayUrl: `${cdnUrl}/${dispUrlRes.fileKey}`,
+          type: file.type,
           metadata: {
             originalName: file.name,
             size: file.size,
-            type: file.type,
+            lastModified: file.lastModified
           }
         });
 
-        toast.success(`${file.name} uploaded successfully`, {
+        toast.success(`${file.name} Ingested!`, {
           id: toastId,
-          description: "Asset is now indexed in your library",
+          description: "Optimized resolutions ready.",
         });
-
-        // Reactive Update
-        queryClient.invalidateQueries({ queryKey: ["assets"] });
-
+        
+        // Refresh gallery
+        queryClient.invalidateQueries(["assets"]);
       } catch (err) {
-        console.error(`[Upload Error - ${file.name}]:`, err);
-        toast.error(`Failed to upload ${file.name}`, {
+        console.error("[handleDirectUpload Error]:", err);
+        toast.error(`Upload failed: ${file.name}`, {
           id: toastId,
           description: err.message,
         });

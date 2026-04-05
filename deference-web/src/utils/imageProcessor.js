@@ -1,45 +1,74 @@
-import imageCompression from 'browser-image-compression';
+/**
+ * imageProcessor.js
+ * Client-side utility for 3-stage multi-resolution processing.
+ * Generates Optimized Thumbnails and Display versions before R2 upload.
+ */
+
+const THUMB_SIZE = 400; // px
+const DISPLAY_SIZE = 1200; // px
 
 /**
- * 3-Tier Image Processing Pipeline
- * Compresses an original file into `thumb` (1200px) and `display` (1600px) webp formats.
- * Utilizes WebWorkers for parallel processing without blocking the UI thread.
- * 
- * @param {File} file 
- * @returns {Promise<{ thumb: File, display: File, original: File }>}
+ * Resizes an image file to a specific max dimension while preserving aspect ratio.
+ */
+async function resizeImage(file, maxSize) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      
+      let width = img.width;
+      let height = img.height;
+
+      // Only resize if the image is larger than the target
+      if (width > maxSize || height > maxSize) {
+        if (width > height) {
+          height = (height * maxSize) / width;
+          width = maxSize;
+        } else {
+          width = (width * maxSize) / height;
+          height = maxSize;
+        }
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      
+      // Use high-quality interpolation
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Canvas toBlob failed"));
+        },
+        file.type,
+        0.85 // Quality slightly reduced for space vs quality balance
+      );
+    };
+    img.onerror = () => reject(new Error("Image loading failed"));
+  });
+}
+
+/**
+ * Main processor: Returns { thumb, display, original }
  */
 export async function processImage(file) {
-  if (!file.type.startsWith('image/')) {
+  // If not an image, just return the original
+  if (!file.type.startsWith("image/")) {
     return { thumb: file, display: file, original: file };
   }
 
-  // Thumb config (Max 1200px, quality 0.9, WebP)
-  const thumbOptions = {
-    maxSizeMB: 1,
-    maxWidthOrHeight: 1200,
-    useWebWorker: true,
-    fileType: 'image/webp',
-    initialQuality: 0.9,
-  };
-
-  // Display config (Max 1600px, quality 0.8, WebP)
-  const displayOptions = {
-    maxSizeMB: 2,
-    maxWidthOrHeight: 1600,
-    useWebWorker: true,
-    fileType: 'image/webp',
-    initialQuality: 0.8,
-  };
-
   try {
-    const [thumbBlob, displayBlob] = await Promise.all([
-      imageCompression(file, thumbOptions),
-      imageCompression(file, displayOptions)
+    const [thumb, display] = await Promise.all([
+      resizeImage(file, THUMB_SIZE),
+      resizeImage(file, DISPLAY_SIZE)
     ]);
-
-    // Convert blobs back to File objects
-    const thumb = new File([thumbBlob], `${file.name.split('.')[0]}-thumb.webp`, { type: 'image/webp' });
-    const display = new File([displayBlob], `${file.name.split('.')[0]}-display.webp`, { type: 'image/webp' });
 
     return {
       thumb,
@@ -47,7 +76,8 @@ export async function processImage(file) {
       original: file
     };
   } catch (error) {
-    console.error('[ImageProcessor] Compression failed:', error);
-    throw error;
+    console.error("[imageProcessor Error]:", error);
+    // Fallback to original if processing fails
+    return { thumb: file, display: file, original: file };
   }
 }

@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Providers } from "@/components/providers";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toaster } from "@/components/ui/sonner";
+import { AssetDetailModal } from "@/components/asset-detail-modal";
 
 export const metadata = {
   title: "Deference - SaaS Dashboard",
@@ -53,6 +54,7 @@ export default function RootLayout({ children }) {
               </Providers>
             </TooltipProvider>
             <Toaster position="top-right" richColors closeButton />
+            <AssetDetailModal />
           </ThemeProvider>
         </body>
       </html>

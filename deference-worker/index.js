@@ -75,19 +75,19 @@ async function handleAssets(request, env, corsHeaders) {
   try {
     console.log("[handleAssets] 로드된 ENV 키:", Object.keys(env));
     const data = await request.json();
-    const { id, userId, fileKey, tags, metadata, type } = data;
+    const { id, userId, fileKey, tags, metadata, type, thumbUrl, displayUrl } = data;
     const finalType = type || (metadata && metadata.type) || "application/octet-stream";
     
     const cdnUrl = env.CDN_URL || `https://pub-d2476b64512145c0894fe40bd87e4194.r2.dev`;
-    const imageUrl = `${cdnUrl}/${fileKey}`;
+    const imageUrl = `${cdnUrl}/${fileKey}`; // Original pointer
 
     const batchOps = [];
 
-    // 1. Insert Core Asset
+    // 1. Insert Core Asset (Extended with multi-res support)
     batchOps.push(
       env.DB.prepare(
-        "INSERT INTO assets (id, user_id, file_key, type, original_url, metadata) VALUES (?, ?, ?, ?, ?, ?)"
-      ).bind(id, userId, fileKey, finalType, imageUrl, JSON.stringify(metadata || {}))
+        "INSERT INTO assets (id, user_id, file_key, type, original_url, thumb_url, display_url, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(id, userId, fileKey, finalType, imageUrl, thumbUrl || imageUrl, displayUrl || imageUrl, JSON.stringify(metadata || {}))
     );
 
     // 2. Process Tags
