@@ -8,6 +8,7 @@ import { TopHeader } from "@/components/top-header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Providers } from "@/components/providers";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata = {
   title: "Deference - SaaS Dashboard",
@@ -51,6 +52,7 @@ export default function RootLayout({ children }) {
                 </SidebarProvider>
               </Providers>
             </TooltipProvider>
+            <Toaster position="top-right" richColors closeButton />
           </ThemeProvider>
         </body>
       </html>
