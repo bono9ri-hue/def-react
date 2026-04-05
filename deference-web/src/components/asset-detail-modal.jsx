@@ -102,7 +102,7 @@ export function AssetDetailModal() {
 
           {/* Left Section: Immersive Image Stage (Click Backdrop to Close) */}
           <div 
-            className="flex-1 h-full flex items-center justify-center p-8 cursor-zoom-out"
+            className="flex-1 h-full flex items-center justify-center p-8 cursor-zoom-out animate-in fade-in duration-300 ease-out"
             onClick={() => setSelectedAssetId(null)}
           >
             {asset ? (
@@ -110,7 +110,7 @@ export function AssetDetailModal() {
                 src={asset.display_url || asset.original_url}
                 alt={asset.metadata?.originalName || "Asset"}
                 onClick={(e) => e.stopPropagation()} // Prevent close when clicking image
-                className="max-w-full max-h-full object-contain drop-shadow-[0_0_50px_rgba(0,0,0,0.6)] cursor-default animate-in fade-in zoom-in-95 duration-500"
+                className="max-w-full max-h-full object-contain drop-shadow-[0_0_50px_rgba(0,0,0,0.6)] cursor-default animate-in fade-in zoom-in-[0.98] duration-300 ease-out"
               />
             ) : (
               <div className="flex flex-col items-center gap-3 text-white/30">
@@ -121,7 +121,7 @@ export function AssetDetailModal() {
 
           {/* Right Section: Separate Floating Card (Shadcn Style) */}
           <div 
-            className="w-[400px] shrink-0 bg-background h-[calc(100vh-2rem)] my-4 mr-4 rounded-2xl shadow-2xl border border-border flex flex-col p-8 overflow-y-auto cursor-default animate-in slide-in-from-right-10 duration-500 scrollbar-hide"
+            className="w-[400px] shrink-0 bg-background h-[calc(100vh-2rem)] my-4 mr-4 rounded-2xl shadow-2xl border border-border flex flex-col p-8 overflow-y-auto cursor-default animate-in slide-in-from-right-8 fade-in duration-500 ease-out scrollbar-hide"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Action Bar (Top) */}
