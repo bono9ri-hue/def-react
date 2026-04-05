@@ -108,7 +108,7 @@
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --layout-v-gap: 1.5rem; /* 세로 섹션 간격 (24px) */
-  --page-padding: 0.75rem; /* 모바일 (12px, Scale 3) */
+  --page-padding: 1rem; /* 모바일 (16px) - SSOT */
 }
 
 @media (min-width: 768px) {

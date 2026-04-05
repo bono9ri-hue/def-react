@@ -144,7 +144,7 @@ export function TopHeader() {
     <header className="sticky top-0 z-40 flex items-center justify-between h-[52px] w-full bg-transparent md:bg-background/95 md:backdrop-blur-sm shrink-0">
       
       {/* 1. Left Area: Sidebar Trigger (flex-1 flex justify-start) */}
-      <div className="flex-1 flex items-center justify-start min-w-0 px-4 md:px-0">
+      <div className="flex-1 flex items-center justify-start min-w-0">
         {!isLoaded ? (
           <Skeleton className={cn(buttonVariants({ variant: "secondary", size: "icon" }), "rounded-full flex-shrink-0 bg-muted/40")} />
         ) : (

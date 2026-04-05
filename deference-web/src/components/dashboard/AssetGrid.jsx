@@ -39,7 +39,7 @@ export default function AssetGrid({ customAssets, collectionId }) {
     ];
     
     return (
-      <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-3 space-y-3 px-4 md:px-0">
+      <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-3 space-y-3">
         {skeletonHeights.map((height, i) => (
           <div key={i} className="break-inside-avoid mb-3 overflow-hidden rounded-none border border-border/40 bg-muted/20">
             <Skeleton className={`${height} w-full rounded-none`} />
@@ -85,7 +85,7 @@ export default function AssetGrid({ customAssets, collectionId }) {
 
   // Phase 3: Global Responsive Masonry Grid
   return (
-    <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-3 space-y-3 px-4 md:px-0">
+    <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-3 space-y-3">
       {currentAssets.map((asset) => (
         <div key={asset.id} className="break-inside-avoid mb-3 group relative cursor-pointer overflow-hidden rounded-none border border-border/40 bg-muted/20">
           {/* 1. Item Skeleton Placeholder (Always present as background) */}
