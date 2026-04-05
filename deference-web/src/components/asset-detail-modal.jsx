@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAssets } from "@/lib/api";
 import {
@@ -18,38 +17,66 @@ import {
   FileText, 
   Maximize2 
 } from "lucide-react";
+import useAssetStore from "@/store/useAssetStore";
 
 /**
  * AssetDetailModal
- * Query-string based modal for asset deep-linking (?asset=ID).
- * Provides a high-end 2-column Lightbox viewer (Display res) and Original metadata.
+ * Zustand + History API Hybrid Modal.
+ * Bypasses Next.js RSC 404 errors while maintaining Deep Linking (?asset=ID).
  */
 export function AssetDetailModal() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const assetId = searchParams.get("asset");
+  const { selectedAssetId, setSelectedAssetId } = useAssetStore();
 
-  // Fetch or retrieve assets from cache
+  // (1) Initial Hydration: URL -> Store (On Mount)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const assetId = params.get("asset");
+    if (assetId) {
+      setSelectedAssetId(assetId);
+    }
+  }, [setSelectedAssetId]);
+
+  // (2) Reactive Sync: Store -> URL (On State Change)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (selectedAssetId) {
+      params.set("asset", selectedAssetId);
+      window.history.pushState(null, "", `${window.location.pathname}?${params.toString()}`);
+    } else {
+      // Clear param on close
+      const hasAsset = params.has("asset");
+      if (hasAsset) {
+        params.delete("asset");
+        const newQuery = params.toString();
+        const newUrl = newQuery ? `${window.location.pathname}?${newQuery}` : window.location.pathname;
+        window.history.replaceState(null, "", newUrl);
+      }
+    }
+  }, [selectedAssetId]);
+
+  // Handle Browser Back/Forward buttons
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setSelectedAssetId(params.get("asset"));
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [setSelectedAssetId]);
+
+  // Data Fetching
   const { data: assets = [] } = useQuery({
     queryKey: ["assets"],
     queryFn: fetchAssets,
     staleTime: 1000 * 60 * 5,
   });
 
-  const asset = assets.find((a) => a.id === assetId);
+  const asset = assets.find((a) => a.id === selectedAssetId);
 
-  const handleClose = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("asset");
-    const query = params.toString();
-    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  };
-
-  if (!assetId) return null;
+  if (!selectedAssetId) return null;
 
   return (
-    <Dialog open={!!assetId} onOpenChange={(open) => !open && handleClose()}>
+    <Dialog open={!!selectedAssetId} onOpenChange={(open) => !open && setSelectedAssetId(null)}>
       <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0 overflow-hidden bg-black/95 border-none rounded-none shadow-2xl flex flex-col md:grid md:grid-cols-[1fr_350px]">
         {/* A11y Requirement: DialogTitle (sr-only) */}
         <DialogTitle className="sr-only">에셋 상세 보기: {asset?.metadata?.originalName || "Asset"}</DialogTitle>

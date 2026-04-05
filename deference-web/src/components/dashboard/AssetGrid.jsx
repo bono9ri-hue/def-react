@@ -4,8 +4,9 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAssets } from "@/lib/api";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpRight, Folder, Loader2, Plus, Sparkles, Image as ImageIcon } from "lucide-react";
+import useAssetStore from "@/store/useAssetStore";
 import { 
   Empty, 
   EmptyContent, 
@@ -30,18 +31,12 @@ export default function AssetGrid({ customAssets, collectionId }) {
     enabled: !customAssets,
   });
 
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const currentAssets = customAssets || fetchedAssets || [];
+  const setSelectedAssetId = useAssetStore((state) => state.setSelectedAssetId);
 
   const handleOpenDetail = (e, id) => {
     e.preventDefault();
     e.stopPropagation();
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("asset", id);
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    setSelectedAssetId(id);
   };
 
   // Phase 1: Stochastic Masonry Skeleton (Premium Loading)
