@@ -31,7 +31,7 @@ export default function RootLayout({ children }) {
       }}
     >
       <html lang="ko" suppressHydrationWarning>
-        <body className="font-sans antialiased selection:bg-primary/20 bg-background text-foreground">
+        <body className="font-sans antialiased selection:bg-primary/20 bg-background text-foreground" suppressHydrationWarning>
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
@@ -49,12 +49,12 @@ export default function RootLayout({ children }) {
                         {children}
                       </ScrollArea>
                     </main>
+                    <AssetDetailModal />
                   </SidebarInset>
                 </SidebarProvider>
               </Providers>
             </TooltipProvider>
             <Toaster position="top-right" richColors closeButton />
-            <AssetDetailModal />
           </ThemeProvider>
         </body>
       </html>
