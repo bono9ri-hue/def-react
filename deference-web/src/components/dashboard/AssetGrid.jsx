@@ -32,10 +32,12 @@ export default function AssetGrid({ customAssets, collectionId }) {
   });
 
   const setSelectedAssetId = useAssetStore((state) => state.setSelectedAssetId);
+  const currentAssets = customAssets || fetchedAssets || [];
 
   const handleOpenDetail = (e, id) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log("🔥 [DEBUG 1] 썸네일 클릭됨, 전달할 ID:", id);
     setSelectedAssetId(id);
   };
 

@@ -27,6 +27,8 @@ import useAssetStore from "@/store/useAssetStore";
 export function AssetDetailModal() {
   const { selectedAssetId, setSelectedAssetId } = useAssetStore();
 
+  console.log("🔥 [DEBUG 2] 모달이 인식한 현재 selectedAssetId:", selectedAssetId);
+
   // (1) Initial Hydration: URL -> Store (On Mount)
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -65,13 +67,13 @@ export function AssetDetailModal() {
   }, [setSelectedAssetId]);
 
   // Data Fetching
-  const { data: assets = [] } = useQuery({
+  const { data: currentAssets = [] } = useQuery({
     queryKey: ["assets"],
     queryFn: fetchAssets,
     staleTime: 1000 * 60 * 5,
   });
 
-  const asset = assets.find((a) => a.id === selectedAssetId);
+  const asset = currentAssets?.find((a) => a.id === selectedAssetId) || null;
 
   if (!selectedAssetId) return null;
 
