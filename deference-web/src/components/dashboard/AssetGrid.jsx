@@ -21,6 +21,8 @@ import { Skeleton } from "@/components/ui/skeleton";
  * AssetGrid: Responsive Masonry-style gallery for Deference Assets.
  */
 export default function AssetGrid({ customAssets, collectionId }) {
+  const setSelectedAssetId = useAssetStore((state) => state.setSelectedAssetId);
+
   const { 
     data: fetchedAssets = [], 
     isLoading, 
@@ -31,7 +33,6 @@ export default function AssetGrid({ customAssets, collectionId }) {
     enabled: !customAssets,
   });
 
-  const setSelectedAssetId = useAssetStore((state) => state.setSelectedAssetId);
   const currentAssets = customAssets || fetchedAssets || [];
 
   const handleOpenDetail = (e, id) => {
@@ -148,7 +149,7 @@ export default function AssetGrid({ customAssets, collectionId }) {
                 size="icon-sm" 
                 variant="ghost" 
                 className="rounded-full bg-white/20 hover:!bg-white/30 text-white hover:!text-white border-0 shadow-2xl p-0 transition-colors shrink-0"
-                onClick={(e) => { e.stopPropagation(); handleOpenDetail(asset.id); }}
+                onClick={(e) => { e.stopPropagation(); handleOpenDetail(e, asset.id); }}
               >
                 <ArrowUpRight className="w-4 h-4" strokeWidth={2.5} />
               </Button>

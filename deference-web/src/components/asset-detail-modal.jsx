@@ -27,7 +27,14 @@ import useAssetStore from "@/store/useAssetStore";
 export function AssetDetailModal() {
   const { selectedAssetId, setSelectedAssetId } = useAssetStore();
 
-  console.log("🔥 [DEBUG 2] 모달이 인식한 현재 selectedAssetId:", selectedAssetId);
+  // (0) Data Fetching
+  const { data: currentAssets = [] } = useQuery({
+    queryKey: ["assets"],
+    queryFn: fetchAssets,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const asset = currentAssets?.find((a) => a.id === selectedAssetId) || null;
 
   // (1) Initial Hydration: URL -> Store (On Mount)
   React.useEffect(() => {
@@ -56,7 +63,7 @@ export function AssetDetailModal() {
     }
   }, [selectedAssetId]);
 
-  // Handle Browser Back/Forward buttons
+  // (3) Handle Browser Back/Forward buttons
   React.useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -66,14 +73,7 @@ export function AssetDetailModal() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [setSelectedAssetId]);
 
-  // Data Fetching
-  const { data: currentAssets = [] } = useQuery({
-    queryKey: ["assets"],
-    queryFn: fetchAssets,
-    staleTime: 1000 * 60 * 5,
-  });
-
-  const asset = currentAssets?.find((a) => a.id === selectedAssetId) || null;
+  console.log("🔥 [DEBUG 2] 모달이 인식한 현재 selectedAssetId:", selectedAssetId);
 
   if (!selectedAssetId) return null;
 
