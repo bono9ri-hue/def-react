@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,8 +22,8 @@ import useAssetStore from "@/store/useAssetStore";
 
 /**
  * AssetDetailModal
- * Zustand + History API Hybrid Modal.
- * Bypasses Next.js RSC 404 errors while maintaining Deep Linking (?asset=ID).
+ * Hybrid Architecture: Zustand State + Manual History API Sync.
+ * Implements a high-end 2-column "Studio" Lightbox UI.
  */
 export function AssetDetailModal() {
   const { selectedAssetId, setSelectedAssetId } = useAssetStore();
@@ -73,113 +74,118 @@ export function AssetDetailModal() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [setSelectedAssetId]);
 
-  console.log("🔥 [DEBUG 2] 모달이 인식한 현재 selectedAssetId:", selectedAssetId);
+  const handleClose = (open) => {
+    if (!open) {
+      setSelectedAssetId(null);
+    }
+  };
 
   if (!selectedAssetId) return null;
 
   return (
-    <Dialog open={!!selectedAssetId} onOpenChange={(open) => !open && setSelectedAssetId(null)}>
+    <Dialog open={!!selectedAssetId} onOpenChange={handleClose}>
       <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0 overflow-hidden bg-black/95 border-none rounded-none shadow-2xl flex flex-col md:grid md:grid-cols-[1fr_350px]">
-        {/* A11y Requirement: DialogTitle (sr-only) */}
+        {/* A11y Requirement: Title & Description (Visual-Hidden) */}
         <DialogTitle className="sr-only">에셋 상세 보기: {asset?.metadata?.originalName || "Asset"}</DialogTitle>
+        <DialogDescription className="sr-only">에셋의 고해상도 미리보기와 상세 메타데이터 및 다운로드 옵션을 제공하는 패널입니다.</DialogDescription>
 
-        {/* Left Section: Immersive Viewer */}
+        {/* Left Section: Immersive Studio Viewer */}
         <div className="relative flex-1 flex items-center justify-center bg-black/50 p-4 border-b md:border-b-0 md:border-r border-border/10 overflow-hidden">
           {asset ? (
             <>
               {/* Backglow Ambient Stage */}
               <div 
-                className="absolute inset-0 blur-[100px] opacity-10 pointer-events-none scale-150"
+                className="absolute inset-0 blur-[120px] opacity-15 pointer-events-none scale-150 transition-opacity duration-1000"
                 style={{ backgroundImage: `url(${asset.display_url || asset.original_url})`, backgroundSize: 'cover' }}
               />
               <img 
                 src={asset.display_url || asset.original_url}
                 alt={asset.metadata?.originalName || "Asset"}
-                className="relative z-10 object-contain w-full h-full max-h-full drop-shadow-[0_20px_50px_rgba(0,0,0,0.8)] transition-all duration-700 animate-in fade-in zoom-in-95"
+                className="relative z-10 object-contain w-full h-full max-h-full drop-shadow-[0_20px_60px_rgba(0,0,0,0.9)] transition-all duration-700 animate-in fade-in zoom-in-95"
               />
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center gap-3">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/10 border-t-white/40" />
-              <span className="text-[10px] uppercase font-black tracking-widest text-white/30 animate-pulse">Syncing Buffer...</span>
+            <div className="w-full h-full flex flex-col items-center justify-center gap-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/5 border-t-white/30" />
+              <span className="text-[10px] uppercase font-black tracking-[0.3em] text-white/20 animate-pulse">Synchronizing Data Buffer...</span>
             </div>
           )}
         </div>
 
-        {/* Right Section: Floating Action/Info Panel */}
-        <div className="bg-background p-8 flex flex-col gap-10 overflow-y-auto border-l border-border/10">
-          {/* Header & Type Classification */}
+        {/* Right Section: High-Density Info & Action Panel */}
+        <div className="bg-background p-8 flex flex-col gap-10 overflow-y-auto border-l border-border/10 scrollbar-hide">
+          {/* Section: Header & Type Branding */}
           <div className="space-y-4">
-            <Badge variant="secondary" className="rounded-none bg-muted hover:bg-muted text-[9px] font-black uppercase tracking-widest px-2 py-0.5">
-              {asset?.type?.split('/')?.[1] || 'Binary Object'}
+            <Badge variant="secondary" className="rounded-none bg-muted hover:bg-muted text-[10px] font-black uppercase tracking-[0.2em] px-2.5 py-1">
+              {asset?.type?.split('/')?.[1] || 'Object'}
             </Badge>
-            <h2 className="text-xl font-black tracking-tight leading-tight text-foreground/90 break-words line-clamp-3">
-              {asset?.metadata?.originalName || asset?.file_key || "Untitled Object"}
+            <h2 className="text-2xl font-black tracking-tighter leading-[1.1] text-foreground/90 break-words line-clamp-4">
+              {asset?.metadata?.originalName || asset?.file_key || "Untitled"}
             </h2>
           </div>
 
-          {/* Core Action Group (Premium Buttons) */}
-          <div className="grid grid-cols-1 gap-2.5">
-            <Button asChild className="rounded-none h-12 bg-foreground text-background hover:bg-foreground/90 font-black text-[11px] uppercase tracking-[0.2em] transition-all">
+          {/* Section: Primary CTA Stack */}
+          <div className="grid grid-cols-1 gap-3">
+            <Button asChild className="rounded-none h-14 bg-foreground text-background hover:bg-foreground/90 font-black text-[12px] uppercase tracking-[0.25em] transition-all shadow-xl">
               <a href={asset?.original_url} target="_blank" rel="noopener noreferrer" download>
-                <Download className="w-3.5 h-3.5 mr-2" strokeWidth={3} /> Download Source
+                <Download className="w-4 h-4 mr-2.5" strokeWidth={3} /> Download Master
               </a>
             </Button>
-            <Button variant="outline" asChild className="rounded-none h-12 border-border/50 hover:bg-muted font-bold text-[10px] uppercase tracking-widest">
+            <Button variant="outline" asChild className="rounded-none h-14 border-border/40 hover:bg-muted font-bold text-[11px] uppercase tracking-widest transition-colors">
               <a href={asset?.original_url} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-3.5 h-3.5 mr-2" /> View Original File
+                <ExternalLink className="w-4 h-4 mr-2.5" /> Open Source
               </a>
             </Button>
           </div>
 
-          {/* Technical Specifications Grid */}
-          <div className="space-y-6 pt-6 border-t border-border/10">
-            <div className="flex items-start gap-4">
-              <div className="w-9 h-9 rounded-none bg-muted flex items-center justify-center shrink-0">
-                <Calendar className="w-4 h-4 text-muted-foreground/60" />
+          {/* Section: Technical Specs Grid */}
+          <div className="space-y-8 pt-8 border-t border-border/10">
+            <div className="flex items-start gap-5">
+              <div className="w-10 h-10 rounded-none bg-muted/50 flex items-center justify-center shrink-0 border border-border/5">
+                <Calendar className="w-4.5 h-4.5 text-muted-foreground/50" />
               </div>
               <div className="min-w-0">
-                <p className="text-[9px] text-muted-foreground/40 uppercase font-black tracking-widest mb-1">Ingestion Date</p>
-                <p className="text-[11px] font-bold text-foreground/70 leading-none">
-                  {asset ? new Date(asset.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : "-"}
+                <p className="text-[10px] text-muted-foreground/30 uppercase font-bold tracking-[0.15em] mb-1.5">Created On</p>
+                <p className="text-[13px] font-black text-foreground/80 leading-none">
+                  {asset ? new Date(asset.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : "--"}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-4">
-              <div className="w-9 h-9 rounded-none bg-muted flex items-center justify-center shrink-0">
-                <Maximize2 className="w-4 h-4 text-muted-foreground/60" />
+            <div className="flex items-start gap-5">
+              <div className="w-10 h-10 rounded-none bg-muted/50 flex items-center justify-center shrink-0 border border-border/5">
+                <Maximize2 className="w-4.5 h-4.5 text-muted-foreground/50" />
               </div>
               <div className="min-w-0">
-                <p className="text-[9px] text-muted-foreground/40 uppercase font-black tracking-widest mb-1">Pixel Geometry</p>
-                <p className="text-[11px] font-bold text-foreground/70 leading-none">
+                <p className="text-[10px] text-muted-foreground/30 uppercase font-bold tracking-[0.15em] mb-1.5">Dimensions / Size</p>
+                <p className="text-[13px] font-black text-foreground/80 leading-none">
                   {asset?.metadata?.dimensions 
                     ? `${asset.metadata.dimensions.width} × ${asset.metadata.dimensions.height}`
-                    : `${(asset?.metadata?.size / 1024 / 1024).toFixed(2)} MB`}
+                    : asset?.metadata?.size ? `${(asset.metadata.size / 1024 / 1024).toFixed(2)} MB` : "--"}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-4">
-              <div className="w-9 h-9 rounded-none bg-muted flex items-center justify-center shrink-0">
-                <FileText className="w-4 h-4 text-muted-foreground/60" />
+            <div className="flex items-start gap-5">
+              <div className="w-10 h-10 rounded-none bg-muted/50 flex items-center justify-center shrink-0 border border-border/5">
+                <FileText className="w-4.5 h-4.5 text-muted-foreground/50" />
               </div>
-              <div className="min-w-0">
-                <p className="text-[9px] text-muted-foreground/40 uppercase font-black tracking-widest mb-1">Logical Key</p>
-                <p className="text-[10px] font-mono text-muted-foreground/60 break-all leading-tight tracking-tighter">
-                  {asset?.id}
+              <div className="min-w-0 w-full overflow-hidden">
+                <p className="text-[10px] text-muted-foreground/30 uppercase font-bold tracking-[0.15em] mb-1.5">System Identifier</p>
+                <p className="text-[11px] font-mono text-muted-foreground/60 break-all leading-relaxed tracking-tight bg-muted/20 p-2 border border-border/5">
+                  {asset?.id || "--"}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Associated Tag System */}
+          {/* Section: Dynamic Meta Tags */}
           {asset?.tags?.length > 0 && (
-            <div className="space-y-4 pt-6 border-t border-border/10">
-              <p className="text-[9px] text-muted-foreground/40 uppercase font-black tracking-widest">Metadata Tags</p>
-              <div className="flex flex-wrap gap-1.5">
+            <div className="space-y-4 pt-8 border-t border-border/10 mt-auto">
+              <p className="text-[10px] text-muted-foreground/30 uppercase font-bold tracking-[0.15em]">Classification Tags</p>
+              <div className="flex flex-wrap gap-2">
                 {asset.tags.map(t => (
-                  <Badge key={t} variant="outline" className="rounded-none text-[9px] font-bold px-2 py-0.5 border-border/50 text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors transition-all cursor-default uppercase">
+                  <Badge key={t} variant="outline" className="rounded-none text-[10px] font-black px-3 py-1 border-border/30 text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-all cursor-default uppercase tracking-wider">
                     {t}
                   </Badge>
                 ))}
