@@ -84,108 +84,100 @@ export function AssetDetailModal() {
 
   return (
     <Dialog open={!!selectedAssetId} onOpenChange={handleClose}>
-      <DialogContent className="!max-w-[95vw] !w-full !h-[90vh] !p-0 overflow-hidden bg-black/95 border-none rounded-none shadow-2xl flex flex-col md:!grid md:!grid-cols-[1fr_350px]">
+      <DialogContent className="!max-w-[95vw] !w-full !h-[90vh] !p-0 overflow-hidden bg-background sm:rounded-xl border border-border flex flex-col md:!grid md:!grid-cols-[1fr_400px] shadow-2xl">
         {/* A11y Requirement: Title & Description (Visual-Hidden) */}
         <DialogTitle className="sr-only">에셋 상세 보기: {asset?.metadata?.originalName || "Asset"}</DialogTitle>
         <DialogDescription className="sr-only">에셋의 고해상도 미리보기와 상세 메타데이터 및 다운로드 옵션을 제공하는 패널입니다.</DialogDescription>
 
-        {/* Left Section: Immersive Studio Viewer */}
-        <div className="relative flex-1 flex items-center justify-center bg-black/50 p-4 border-b md:border-b-0 md:border-r border-border/10 overflow-hidden min-h-[50vh] md:min-h-0">
+        {/* Left Section: Immersive Viewer */}
+        <div className="relative flex-1 bg-zinc-950 flex items-center justify-center p-6 border-b md:border-b-0 md:border-r border-border min-h-[40vh] md:min-h-0">
           {asset ? (
-            <>
-              {/* Backglow Ambient Stage */}
-              <div
-                className="absolute inset-0 blur-[120px] opacity-15 pointer-events-none scale-150 transition-opacity duration-1000"
-                style={{ backgroundImage: `url(${asset.display_url || asset.original_url})`, backgroundSize: 'cover' }}
-              />
-              <img
-                src={asset.display_url || asset.original_url}
-                alt={asset.metadata?.originalName || "Asset"}
-                className="relative z-10 object-contain w-full h-full max-h-full drop-shadow-[0_20px_60px_rgba(0,0,0,0.9)] transition-all duration-700 animate-in fade-in zoom-in-95"
-              />
-            </>
+            <img
+              src={asset.display_url || asset.original_url}
+              alt={asset.metadata?.originalName || "Asset"}
+              className="relative z-10 object-contain w-full h-full max-h-full drop-shadow-2xl transition-all duration-500 animate-in fade-in zoom-in-95"
+            />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/5 border-t-white/30" />
-              <span className="text-[10px] uppercase font-black tracking-[0.3em] text-white/20 animate-pulse">Synchronizing Data Buffer...</span>
+            <div className="flex flex-col items-center gap-4 text-zinc-500">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-current border-t-transparent" />
+              <p className="text-xs font-medium">데이터 로드 중...</p>
             </div>
           )}
         </div>
 
-        {/* Right Section: High-Density Info & Action Panel */}
-        <div className="bg-background !p-8 flex flex-col gap-10 overflow-y-auto border-l border-border/10 scrollbar-hide shrink-0">
-          {/* Section: Header & Type Branding */}
-          <div className="space-y-4">
-            <Badge variant="secondary" className="rounded-none bg-muted hover:bg-muted text-[10px] font-black uppercase tracking-[0.2em] px-2.5 py-1">
-              {asset?.type?.split('/')?.[1] || 'Object'}
-            </Badge>
-            <h2 className="text-2xl font-black tracking-tighter leading-[1.1] text-foreground/90 break-words line-clamp-4">
-              {asset?.metadata?.originalName || asset?.file_key || "Untitled"}
+        {/* Right Section: Standardized Info & Action Panel */}
+        <div className="bg-background p-6 flex flex-col gap-8 overflow-y-auto scrollbar-hide shrink-0">
+          {/* Section: Header */}
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-bold tracking-tight text-foreground">
+              {asset?.metadata?.originalName || asset?.file_key || "이름 없는 파일"}
             </h2>
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <Badge variant="secondary" className="px-1.5 py-0 h-5 text-[10px] font-semibold">
+                {asset?.type?.split('/')?.[1]?.toUpperCase() || 'FILE'}
+              </Badge>
+              에셋 상세 정보
+            </p>
           </div>
 
-          {/* Section: Primary CTA Stack */}
-          <div className="grid grid-cols-1 gap-3">
-            <Button asChild className="rounded-none h-14 bg-foreground text-background hover:bg-foreground/90 font-black text-[12px] uppercase tracking-[0.25em] transition-all shadow-xl">
+          {/* Section: Essential Actions */}
+          <div className="grid grid-cols-1 gap-2">
+            <Button asChild className="w-full font-semibold shadow-sm" size="lg">
               <a href={asset?.original_url} target="_blank" rel="noopener noreferrer" download>
-                <Download className="w-4 h-4 mr-2.5" strokeWidth={3} /> Download Master
+                <Download className="w-4 h-4 mr-2" />
+                원본 다운로드
               </a>
             </Button>
-            <Button variant="outline" asChild className="rounded-none h-14 border-border/40 hover:bg-muted font-bold text-[11px] uppercase tracking-widest transition-colors">
+            <Button variant="outline" asChild className="w-full font-medium" size="lg">
               <a href={asset?.original_url} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-4 h-4 mr-2.5" /> Open Source
+                <ExternalLink className="w-4 h-4 mr-2" />
+                새 창으로 열기
               </a>
             </Button>
           </div>
 
-          {/* Section: Technical Specs Grid */}
-          <div className="space-y-8 pt-8 border-t border-border/10">
-            <div className="flex items-start gap-5">
-              <div className="w-10 h-10 rounded-none bg-muted/50 flex items-center justify-center shrink-0 border border-border/5">
-                <Calendar className="w-4.5 h-4.5 text-muted-foreground/50" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] text-muted-foreground/30 uppercase font-bold tracking-[0.15em] mb-1.5">Created On</p>
-                <p className="text-[13px] font-black text-foreground/80 leading-none">
-                  {asset ? new Date(asset.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : "--"}
-                </p>
+          {/* Section: Metadata List (Shadcn Form Style) */}
+          <div className="space-y-6 pt-2">
+            <div className="grid gap-1.5">
+              <span className="text-sm font-medium leading-none text-foreground/70">등록 일자</span>
+              <div className="flex items-center gap-2.5 p-3 rounded-lg border bg-muted/30">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">
+                  {asset ? new Date(asset.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : "-"}
+                </span>
               </div>
             </div>
 
-            <div className="flex items-start gap-5">
-              <div className="w-10 h-10 rounded-none bg-muted/50 flex items-center justify-center shrink-0 border border-border/5">
-                <Maximize2 className="w-4.5 h-4.5 text-muted-foreground/50" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] text-muted-foreground/30 uppercase font-bold tracking-[0.15em] mb-1.5">Dimensions / Size</p>
-                <p className="text-[13px] font-black text-foreground/80 leading-none">
-                  {asset?.metadata?.dimensions
+            <div className="grid gap-1.5">
+              <span className="text-sm font-medium leading-none text-foreground/70">파일 사양</span>
+              <div className="flex items-center gap-2.5 p-3 rounded-lg border bg-muted/30">
+                <Maximize2 className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">
+                  {asset?.metadata?.dimensions 
                     ? `${asset.metadata.dimensions.width} × ${asset.metadata.dimensions.height}`
-                    : asset?.metadata?.size ? `${(asset.metadata.size / 1024 / 1024).toFixed(2)} MB` : "--"}
-                </p>
+                    : asset?.metadata?.size ? `${(asset.metadata.size / 1024 / 1024).toFixed(2)} MB` : "-"}
+                </span>
               </div>
             </div>
 
-            <div className="flex items-start gap-5">
-              <div className="w-10 h-10 rounded-none bg-muted/50 flex items-center justify-center shrink-0 border border-border/5">
-                <FileText className="w-4.5 h-4.5 text-muted-foreground/50" />
-              </div>
-              <div className="min-w-0 w-full overflow-hidden">
-                <p className="text-[10px] text-muted-foreground/30 uppercase font-bold tracking-[0.15em] mb-1.5">System Identifier</p>
-                <p className="text-[11px] font-mono text-muted-foreground/60 break-all leading-relaxed tracking-tight bg-muted/20 p-2 border border-border/5">
-                  {asset?.id || "--"}
-                </p>
+            <div className="grid gap-1.5">
+              <span className="text-sm font-medium leading-none text-foreground/70">시스템 고유 식별자</span>
+              <div className="flex items-center gap-2.5 p-3 rounded-lg border bg-muted/30 overflow-hidden">
+                <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="text-xs font-mono text-muted-foreground truncate">
+                  {asset?.id || "-"}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Section: Dynamic Meta Tags */}
+          {/* Section: Tags */}
           {asset?.tags?.length > 0 && (
-            <div className="space-y-4 pt-8 border-t border-border/10 mt-auto">
-              <p className="text-[10px] text-muted-foreground/30 uppercase font-bold tracking-[0.15em]">Classification Tags</p>
-              <div className="flex flex-wrap gap-2">
+            <div className="space-y-2.5 mt-auto border-t pt-6">
+              <span className="text-sm font-medium leading-none text-foreground/70">태그 데이터</span>
+              <div className="flex flex-wrap gap-1.5">
                 {asset.tags.map(t => (
-                  <Badge key={t} variant="outline" className="rounded-none text-[10px] font-black px-3 py-1 border-border/30 text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-all cursor-default uppercase tracking-wider">
+                  <Badge key={t} variant="secondary" className="px-2 py-0.5 font-medium">
                     {t}
                   </Badge>
                 ))}
