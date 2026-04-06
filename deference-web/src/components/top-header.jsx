@@ -88,14 +88,21 @@ export function TopHeader() {
       });
 
       try {
-        // Step 1: Client-side Image Processing (Thumb/Display/Original)
+        // Step 1: Client-side Image Processing (Thumb/Display/Original) + Metadata Extraction
+        const img = new window.Image();
+        img.src = URL.createObjectURL(file);
+        await new Promise((resolve) => { img.onload = resolve; });
+        const imgWidth = img.width;
+        const imgHeight = img.height;
+        URL.revokeObjectURL(img.src);
+
         const { thumb, display, original } = await processImage(file);
         
         // Step 2: Parallel Request for 3 Presigned URLs
         const [origUrlRes, thumbUrlRes, dispUrlRes] = await Promise.all([
           getUploadUrl(file.name, file.type),
-          getUploadUrl(`thumb_${file.name}`, thumb.type || "image/webp"),
-          getUploadUrl(`display_${file.name}`, display.type || "image/webp")
+          getUploadUrl(`thumb_${file.name.replace(/\.[^/.]+$/, "")}.webp`, "image/webp"),
+          getUploadUrl(`display_${file.name.replace(/\.[^/.]+$/, "")}.webp`, "image/webp")
         ]);
 
         // Step 3: Parallel R2 Direct Streaming
@@ -106,8 +113,8 @@ export function TopHeader() {
 
         await Promise.all([
           fetch(origUrlRes.uploadUrl, { method: "PUT", body: original, headers: { "Content-Type": file.type } }),
-          fetch(thumbUrlRes.uploadUrl, { method: "PUT", body: thumb, headers: { "Content-Type": thumb.type || "image/webp" } }),
-          fetch(dispUrlRes.uploadUrl, { method: "PUT", body: display, headers: { "Content-Type": display.type || "image/webp" } })
+          fetch(thumbUrlRes.uploadUrl, { method: "PUT", body: thumb, headers: { "Content-Type": "image/webp" } }),
+          fetch(dispUrlRes.uploadUrl, { method: "PUT", body: display, headers: { "Content-Type": "image/webp" } })
         ]);
 
         // Step 4: Atomic D1 Metadata Commit
@@ -116,12 +123,14 @@ export function TopHeader() {
           id: origUrlRes.id,
           userId: user.id,
           fileKey: origUrlRes.fileKey,
-          thumbUrl: `${cdnUrl}/${thumbUrlRes.fileKey}`,
-          displayUrl: `${cdnUrl}/${dispUrlRes.fileKey}`,
+          thumb_url: `${cdnUrl}/${thumbUrlRes.fileKey}`,
+          display_url: `${cdnUrl}/${dispUrlRes.fileKey}`,
           type: file.type,
           metadata: {
             originalName: file.name,
             size: file.size,
+            width: imgWidth,
+            height: imgHeight,
             lastModified: file.lastModified
           }
         });

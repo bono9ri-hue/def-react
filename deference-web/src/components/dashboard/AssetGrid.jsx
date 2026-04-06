@@ -38,7 +38,6 @@ export default function AssetGrid({ customAssets, collectionId }) {
   const handleOpenDetail = (e, id) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("🔥 [DEBUG 1] 썸네일 클릭됨, 전달할 ID:", id);
     setSelectedAssetId(id);
   };
 

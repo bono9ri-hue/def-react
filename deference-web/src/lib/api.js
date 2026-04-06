@@ -79,3 +79,119 @@ export async function fetchAssets() {
   }
   return res.json();
 }
+
+/**
+ * [NEW] updateAsset - PATCH /api/assets/:id
+ * Merges and updates asset metadata.
+ */
+export async function updateAsset(id, payload) {
+  const res = await fetch(`${API_BASE}/api/assets/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`[Worker Error PATCH /api/assets/${id}]:`, res.status, errorText);
+    throw new Error(`Failed to update asset: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * [NEW] addAssetTag - POST /api/assets/:id/tags
+ */
+export async function addAssetTag(assetId, tagName) {
+  const res = await fetch(`${API_BASE}/api/assets/${assetId}/tags`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tagName }),
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`[Worker Error POST /api/assets/${assetId}/tags]:`, res.status, errorText);
+    throw new Error(`Failed to add tag: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * [NEW] removeAssetTag - DELETE /api/assets/:id/tags/:tagName
+ */
+export async function removeAssetTag(assetId, tagName) {
+  const res = await fetch(`${API_BASE}/api/assets/${assetId}/tags/${encodeURIComponent(tagName)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`[Worker Error DELETE /api/assets/${assetId}/tags/${tagName}]:`, res.status, errorText);
+    throw new Error(`Failed to remove tag: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * [NEW] forkAssetToCollection - POST /api/assets/:id/fork
+ */
+export async function forkAssetToCollection(assetId, collectionId, userId) {
+  const res = await fetch(`${API_BASE}/api/assets/${assetId}/fork`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ collectionId, userId }),
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`[Worker Error POST /api/assets/${assetId}/fork]:`, res.status, errorText);
+    throw new Error(`Failed to fork asset: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * [NEW] unforkAssetFromCollection - DELETE /api/assets/:id/fork/:collectionId
+ */
+export async function unforkAssetFromCollection(assetId, collectionId) {
+  const res = await fetch(`${API_BASE}/api/assets/${assetId}/fork/${collectionId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`[Worker Error DELETE /api/assets/${assetId}/fork/${collectionId}]:`, res.status, errorText);
+    throw new Error(`Failed to unfork asset: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * [NEW] createCollection - POST /api/collections
+ */
+export async function createCollection(name, userId) {
+  const res = await fetch(`${API_BASE}/api/collections`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, user_id: userId }),
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`[Worker Error POST /api/collections]:`, res.status, errorText);
+    throw new Error(`Failed to create collection: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * [NEW] deleteCollection - DELETE /api/collections/:id
+ */
+export async function deleteCollection(collectionId, userId) {
+  const res = await fetch(`${API_BASE}/api/collections/${collectionId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`[Worker Error DELETE /api/collections/${collectionId}]:`, res.status, errorText);
+    throw new Error(`Failed to delete collection: ${res.status}`);
+  }
+  return res.json();
+}

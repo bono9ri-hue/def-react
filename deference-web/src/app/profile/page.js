@@ -1,15 +1,24 @@
 "use client";
 
 import { useUser, UserButton } from "@clerk/nextjs";
-import { useQuery } from '@tanstack/react-query';
-import { fetchCollections } from '@/lib/api';
-import { LayoutGrid, Lock } from "lucide-react";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchCollections, deleteCollection } from '@/lib/api';
+import { LayoutGrid, Lock, Trash2 } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarImage, AvatarFallback, AvatarGroup } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 /**
  * Profile & Boards Index Page
@@ -26,6 +35,17 @@ export default function ProfilePage() {
     queryKey: ['collections'],
     queryFn: fetchCollections,
   });
+
+  const queryClient = useQueryClient();
+
+  const handleCollectionDelete = async (collectionId) => {
+    try {
+      await deleteCollection(collectionId, user?.id);
+      queryClient.invalidateQueries(['collections']);
+    } catch (err) {
+      console.error("[Delete Error]:", err);
+    }
+  };
 
   if (isError) {
     return (
@@ -134,9 +154,43 @@ export default function ProfilePage() {
                        <h3 className="text-sm font-medium truncate group-hover:text-primary transition-colors">
                         {col.name}
                        </h3>
-                       {col.visibility === 'private' && (
-                         <Icon name={Lock} size="xs" className="text-muted-foreground shrink-0 mt-0.5" />
-                       )}
+                       <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                         {col.visibility === 'private' && (
+                           <Icon name={Lock} size="xs" className="text-muted-foreground shrink-0 mt-0.5" />
+                         )}
+                         
+                         <Dialog>
+                           <DialogTrigger asChild>
+                             <Button 
+                               variant="ghost" 
+                               size="icon-xs" 
+                               className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                             >
+                               <Trash2 className="h-3 w-3" />
+                             </Button>
+                           </DialogTrigger>
+                           <DialogContent className="font-sans">
+                             <DialogHeader>
+                               <DialogTitle>Delete Collection?</DialogTitle>
+                               <DialogDescription>
+                                 Are you sure you want to delete <span className="font-bold text-foreground">"{col.name}"</span>? 
+                                 <br /><br />
+                                 <span className="text-destructive/80 font-medium italic">Original assets will remain safe in your gallery.</span> This only removes the collection organization.
+                               </DialogDescription>
+                             </DialogHeader>
+                             <DialogFooter className="mt-4">
+                               <Button variant="outline" size="sm" onClick={() => {}}>Cancel</Button>
+                               <Button 
+                                 variant="destructive" 
+                                 size="sm"
+                                 onClick={() => handleCollectionDelete(col.id)}
+                               >
+                                 Delete Collection
+                               </Button>
+                             </DialogFooter>
+                           </DialogContent>
+                         </Dialog>
+                       </div>
                     </div>
                     
                     <div className="flex justify-between items-center text-[11px] text-muted-foreground font-medium tracking-tight">

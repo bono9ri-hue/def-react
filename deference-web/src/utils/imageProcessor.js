@@ -4,13 +4,14 @@
  * Generates Optimized Thumbnails and Display versions before R2 upload.
  */
 
-const THUMB_SIZE = 400; // px
-const DISPLAY_SIZE = 1200; // px
+const THUMB_SIZE = 800; // px (Retina-ready)
+const DISPLAY_SIZE = 1920; // px (FHD display)
 
 /**
  * Resizes an image file to a specific max dimension while preserving aspect ratio.
+ * Always outputs as image/webp.
  */
-async function resizeImage(file, maxSize) {
+async function resizeImage(file, maxSize, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = URL.createObjectURL(file);
@@ -47,8 +48,8 @@ async function resizeImage(file, maxSize) {
           if (blob) resolve(blob);
           else reject(new Error("Canvas toBlob failed"));
         },
-        file.type,
-        0.85 // Quality slightly reduced for space vs quality balance
+        "image/webp", // Force webp
+        quality
       );
     };
     img.onerror = () => reject(new Error("Image loading failed"));
@@ -66,8 +67,8 @@ export async function processImage(file) {
 
   try {
     const [thumb, display] = await Promise.all([
-      resizeImage(file, THUMB_SIZE),
-      resizeImage(file, DISPLAY_SIZE)
+      resizeImage(file, THUMB_SIZE, 0.80), // High quality thumb for Retina
+      resizeImage(file, DISPLAY_SIZE, 0.85) // Studio quality display
     ]);
 
     return {

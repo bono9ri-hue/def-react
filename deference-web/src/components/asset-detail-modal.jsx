@@ -1,8 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchAssets } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useUser } from "@clerk/nextjs";
+import { fetchAssets, updateAsset, addAssetTag, removeAssetTag, fetchCollections, forkAssetToCollection, unforkAssetFromCollection, createCollection } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -18,8 +26,27 @@ import {
   ExternalLink, 
   Calendar, 
   FileText, 
-  Maximize2 
+  Maximize2,
+  Tag,
+  Palette,
+  FolderOpen,
+  ChevronDown,
+  Info,
+  Loader2,
+  Check,
+  AlertCircle,
+  X,
+  Plus,
+  Folder
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import useAssetStore from "@/store/useAssetStore";
 
 /**
@@ -39,7 +66,191 @@ export function AssetDetailModal() {
     staleTime: 1000 * 60 * 5,
   });
 
+  const { data: collectionsData = [] } = useQuery({
+    queryKey: ["collections"],
+    queryFn: fetchCollections,
+  });
+  const collections = collectionsData?.collections || (Array.isArray(collectionsData) ? collectionsData : []);
+
+  const { user } = useUser();
+  const queryClient = useQueryClient();
   const asset = currentAssets?.find((a) => a.id === selectedAssetId) || null;
+  const isOwner = user?.id === asset?.user_id;
+
+  // (1) Local State for Zero-Lag Editing
+  const [localTitle, setLocalTitle] = React.useState("");
+  const [localMemo, setLocalMemo] = React.useState("");
+  const [localTags, setLocalTags] = React.useState([]);
+  const [saveStatus, setSaveStatus] = React.useState("idle"); // "idle" | "editing" | "saving" | "saved" | "error"
+  const [forkStatus, setForkStatus] = React.useState("idle"); // "idle" | "forking" | "forked"
+  const [isCreatingCollection, setIsCreatingCollection] = React.useState(false);
+  const [newCollectionName, setNewCollectionName] = React.useState("");
+  
+  const titleRef = React.useRef(null);
+  const memoRef = React.useRef(null);
+
+  // Sync Local State when Asset Changes
+  React.useEffect(() => {
+    if (asset) {
+      setLocalTitle(asset.metadata?.originalName || asset.file_key || "");
+      setLocalMemo(asset.metadata?.memo || "");
+      setLocalTags(asset.tags || []);
+      setSaveStatus("idle");
+      setForkStatus("idle");
+      setIsCreatingCollection(false);
+      setNewCollectionName("");
+    }
+  }, [asset]);
+
+  // (1.5) Auto-resize for Title & Memo
+  React.useEffect(() => {
+    if (titleRef.current) {
+      titleRef.current.style.height = "auto";
+      titleRef.current.style.height = `${titleRef.current.scrollHeight}px`;
+    }
+  }, [localTitle, selectedAssetId]);
+
+  React.useEffect(() => {
+    if (memoRef.current) {
+      memoRef.current.style.height = "auto";
+      memoRef.current.style.height = `${memoRef.current.scrollHeight}px`;
+    }
+  }, [localMemo, selectedAssetId]);
+
+  // (2) Tag Mutations (Optimistic)
+  const handleAddTag = async (tagName) => {
+    if (!isOwner || !asset || !tagName.trim()) return;
+    const cleanTag = tagName.trim();
+    if (localTags.includes(cleanTag)) return;
+
+    // 1. Optimistic UI update
+    setLocalTags(prev => [...prev, cleanTag]);
+    setSaveStatus("saving");
+
+    try {
+      await addAssetTag(asset.id, cleanTag);
+      setSaveStatus("saved");
+      queryClient.invalidateQueries(["assets"]);
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (err) {
+      console.error("[Tag Error]:", err);
+      setSaveStatus("error");
+      // Rollback
+      setLocalTags(prev => prev.filter(t => t !== cleanTag));
+    }
+  };
+
+  const handleRemoveTag = async (tagName) => {
+    if (!isOwner || !asset) return;
+    console.log("Removing tag triggered:", tagName);
+
+    // 1. Optimistic UI update
+    setLocalTags(prev => prev.filter(t => t !== tagName));
+    setSaveStatus("saving");
+
+    try {
+      await removeAssetTag(asset.id, tagName);
+      setSaveStatus("saved");
+      queryClient.invalidateQueries(["assets"]);
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (err) {
+      console.error("[Tag Error]:", err);
+      console.error("Tag rollback executed due to API fail");
+      setSaveStatus("error");
+      // Rollback
+      setLocalTags(prev => [...prev, tagName]);
+    }
+  };
+
+  const handleToggleFork = async (collectionId) => {
+    if (!asset || !collectionId) return;
+    const isMapped = asset.collection_ids?.includes(collectionId);
+    
+    setForkStatus("forking");
+
+    try {
+      if (isMapped) {
+        // Unmap/Unfork
+        await unforkAssetFromCollection(asset.id, collectionId);
+      } else {
+        // Map/Fork
+        await forkAssetToCollection(asset.id, collectionId, user?.id);
+      }
+      
+      setForkStatus("forked");
+      queryClient.invalidateQueries(["assets"]);
+      setTimeout(() => setForkStatus("idle"), 2000);
+    } catch (err) {
+      console.error("[Toggle Fork Error]:", err);
+      setForkStatus("idle");
+    }
+  };
+
+  const handleCreateAndFork = async () => {
+    if (!asset || !newCollectionName.trim()) return;
+    setForkStatus("forking");
+    
+    try {
+      // 1. Create Collection
+      const newCol = await createCollection(newCollectionName.trim(), user?.id);
+      
+      // 2. Fork Asset to New Collection
+      await forkAssetToCollection(asset.id, newCol.id, user?.id);
+      
+      setForkStatus("forked");
+      queryClient.invalidateQueries(["collections"]);
+      queryClient.invalidateQueries(["assets"]);
+      
+      // Reset
+      setIsCreatingCollection(false);
+      setNewCollectionName("");
+      setTimeout(() => setForkStatus("idle"), 3000);
+    } catch (err) {
+      console.error("[Create & Fork Error]:", err);
+      setForkStatus("idle");
+    }
+  };
+
+  // (2) Auto-save Mutation
+  const mutation = useMutation({
+    mutationFn: async ({ id, payload }) => {
+      // (Artificial Delay) Ensure 'Saving...' is visible for at least 500ms to prevent flickering
+      const [result] = await Promise.all([
+        updateAsset(id, payload),
+        new Promise(resolve => setTimeout(resolve, 500))
+      ]);
+      return result;
+    },
+    onMutate: () => {
+      setSaveStatus("saving");
+    },
+    onSuccess: () => {
+      setSaveStatus("saved");
+      queryClient.invalidateQueries(["assets"]);
+      // Revert to idle after 2 seconds
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    },
+    onError: () => {
+      setSaveStatus("error");
+    }
+  });
+
+  const handleAutoSave = (field, value) => {
+    if (!isOwner || !asset) return;
+    
+    // Only save if value actually changed
+    const originalValue = field === "originalName" 
+      ? (asset.metadata?.originalName || asset.file_key) 
+      : (asset.metadata?.memo || "");
+      
+    if (value === originalValue) return;
+
+    console.log(`[Auto-save] Persisting ${field}:`, value);
+    mutation.mutate({
+      id: asset.id,
+      payload: { [field]: value }
+    });
+  };
 
   // Initial Sync from URL
   React.useEffect(() => {
@@ -78,6 +289,11 @@ export function AssetDetailModal() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [setSelectedAssetId]);
 
+  // (1) UI State Sync: Always reset drawer to 'Peek' when switching assets or opening
+  React.useEffect(() => {
+    setIsMobileExpanded(false);
+  }, [selectedAssetId]);
+
   const handleOpenChange = (open) => {
     if (!open) {
       setSelectedAssetId(null);
@@ -95,7 +311,7 @@ export function AssetDetailModal() {
         {/* Full-Screen Stage (Coordinate Parent) */}
         <DialogContent 
           showCloseButton={false} 
-          className="!max-w-none !w-screen !h-[100dvh] !p-0 !m-0 !bg-transparent border-none shadow-none !relative flex md:flex-row overflow-hidden"
+          className="!fixed !top-0 !left-0 !translate-x-0 !translate-y-0 !max-w-none !w-screen !h-[100dvh] !p-0 !m-0 !bg-transparent border-none shadow-none flex md:flex-row overflow-hidden z-50"
         >
           {/* Immersive Background Blur Layer */}
           <div 
@@ -146,120 +362,293 @@ export function AssetDetailModal() {
               <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full mb-3" />
               {!isMobileExpanded ? (
                 <div className="flex items-center gap-3 px-6 w-full animate-in fade-in slide-in-from-bottom-1">
-                  <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-bold h-4">
-                    {asset?.type?.split('/')?.[1]?.toUpperCase() || 'BIN'}
+                  <Badge variant="secondary" className="px-1.5 py-0 text-sm font-bold h-4">
+                    {asset?.type?.split('/')?.[1] || 'bin'}
                   </Badge>
                   <p className="text-sm font-bold truncate text-foreground/80 flex-1">
                     {asset?.metadata?.originalName || "에셋 정보"}
                   </p>
                 </div>
               ) : (
-                <p className="text-sm font-bold text-foreground/40 uppercase tracking-widest">에셋 상세 정보</p>
+                <div className="flex items-center gap-6 w-full animate-in fade-in slide-in-from-bottom-1">
+                  <p className="text-sm font-bold text-foreground/40 tracking-widest flex-1">에셋 상세 정보</p>
+                  
+                  {/* Inline Save Status (Mobile) */}
+                  {saveStatus !== "idle" && (
+                    <div className="flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-300">
+                      {saveStatus === "editing" && <span className="text-sm text-muted-foreground animate-pulse font-bold">...</span>}
+                      {saveStatus === "saving" && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+                      {saveStatus === "saved" && <Check className="w-3 h-3 text-green-500" />}
+                      {saveStatus === "error" && <AlertCircle className="w-3 h-3 text-red-500" />}
+                      <span className={`text-sm font-bold tracking-wider ${
+                        saveStatus === "editing" || saveStatus === "saving" ? "text-muted-foreground" : 
+                        saveStatus === "saved" ? "text-green-500" : "text-red-500"
+                      }`}>
+                        {saveStatus === "editing" ? "Editing" : saveStatus}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Fork Dropdown removed from mobile header */}
+                </div>
               )}
             </div>
 
             {/* Desktop Close/Actions Bar */}
             <div className="hidden md:flex items-center justify-between px-8 pt-8 mb-6">
-              <Badge variant="secondary" className="rounded-none bg-muted text-[10px] font-bold uppercase tracking-widest px-2 py-0.5">
-                {asset?.type?.split('/')?.[1] || 'Object'}
-              </Badge>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="rounded-full hover:bg-muted"
-                onClick={() => setSelectedAssetId(null)}
-              >
-                <Maximize2 className="w-4 h-4 rotate-45" />
-              </Button>
+              <div className="flex items-center gap-4">
+                <Badge variant="secondary" className="bg-muted px-2 py-0.5 text-sm font-medium transition-all">
+                  {asset?.type?.split('/')?.[1] || 'Object'}
+                </Badge>
+                
+                {/* Inline Save Status (Desktop) */}
+                {saveStatus !== "idle" && (
+                  <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                    {saveStatus === "editing" && <span className="text-sm text-muted-foreground animate-pulse font-bold">...</span>}
+                    {saveStatus === "saving" && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+                    {saveStatus === "saved" && <Check className="w-3 h-3 text-green-500" />}
+                    {saveStatus === "error" && <AlertCircle className="w-3 h-3 text-red-500" />}
+                    <span className={`text-sm font-bold tracking-widest ${
+                      saveStatus === "editing" || saveStatus === "saving" ? "text-muted-foreground" : 
+                      saveStatus === "saved" ? "text-green-500" : "text-red-500"
+                    }`}>
+                      {saveStatus === "editing" ? "Editing" : saveStatus}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Fork Dropdown removed from desktop header */}
+
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="rounded-full hover:bg-muted"
+                  onClick={() => setSelectedAssetId(null)}
+                >
+                  <Maximize2 className="w-4 h-4 rotate-45" />
+                </Button>
+              </div>
             </div>
 
             {/* Content Body: Scroll Protected Area */}
             <div className={`
-              flex-1 flex flex-col gap-6 p-6 md:p-8 md:pt-0
-              ${(isMobileExpanded || window.innerWidth >= 768) ? 'overflow-y-auto' : 'overflow-hidden'}
+              flex-1 flex flex-col gap-8 p-6 md:p-8 md:pt-0
+              ${(isMobileExpanded || typeof window !== 'undefined' && window.innerWidth >= 768) ? 'overflow-y-auto' : 'overflow-hidden'}
               scrollbar-hide
             `}>
-              {/* Header Info */}
-              <div className="space-y-2">
-                <h2 className="text-2xl font-bold tracking-tight leading-tight text-foreground">
-                  {asset?.metadata?.originalName || asset?.file_key || "Untitled Object"}
-                </h2>
-                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  Origin Manifest
-                  <span className="w-1 h-1 rounded-full bg-border" />
-                  {asset?.type || "format/raw"}
-                </p>
-              </div>
-
-              {/* Core Actions */}
-              <div className="grid grid-cols-1 gap-2.5">
-                <Button asChild className="w-full font-bold h-12 shadow-xl" size="lg">
-                  <a href={asset?.original_url} target="_blank" rel="noopener noreferrer" download>
-                    <Download className="w-4 h-4 mr-2.5" strokeWidth={2.5} />
-                    Original Source Download
-                  </a>
-                </Button>
-                <Button variant="outline" asChild className="w-full font-bold h-12 border-border/60 hover:bg-muted" size="lg">
-                  <a href={asset?.original_url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="w-4 h-4 mr-2.5" />
-                    Open Source Tab
-                  </a>
-                </Button>
-              </div>
-
-              {/* Spec Map */}
-              <div className="space-y-6 pt-6 border-t border-border/10">
-                <div className="space-y-2.5">
-                  <label className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.2em] ml-1">Ingested</label>
-                  <div className="flex items-center gap-4 p-4 rounded-xl border bg-muted/20">
-                    <Calendar className="w-4.5 h-4.5 text-primary/40 shrink-0" />
-                    <span className="text-[13px] font-bold">
-                      {asset ? new Date(asset.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : "--"}
-                    </span>
-                  </div>
+              {/* A. Title & B. Memo Group */}
+              <div className="flex flex-col gap-0">
+                {/* Title (Pure Seamless) */}
+                <div>
+                  {isOwner ? (
+                    <Textarea 
+                      ref={titleRef}
+                      value={localTitle}
+                      onChange={(e) => {
+                        setLocalTitle(e.target.value);
+                        setSaveStatus("editing");
+                      }}
+                      className="text-3xl font-bold font-heading tracking-tight text-foreground !bg-transparent !border-transparent !shadow-none focus-visible:!ring-0 focus-visible:!border-border hover:!bg-secondary/50 !px-2 -ml-2 h-auto py-2 transition-colors duration-200 font-heading resize-none overflow-hidden !min-h-0"
+                      placeholder="Enter reference name..."
+                      onBlur={(e) => handleAutoSave("originalName", e.target.value)}
+                      rows={1}
+                    />
+                  ) : (
+                    <h2 className="text-3xl font-bold font-heading tracking-tight text-foreground px-2 -ml-2 py-2 whitespace-pre-wrap">
+                      {localTitle || "Untitled Object"}
+                    </h2>
+                  )}
                 </div>
-
-                <div className="space-y-2.5">
-                  <label className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.2em] ml-1">Geometry</label>
-                  <div className="flex items-center gap-4 p-4 rounded-xl border bg-muted/20">
-                    <Maximize2 className="w-4.5 h-4.5 text-primary/40 shrink-0" />
-                    <span className="text-[13px] font-bold">
-                      {asset?.metadata?.dimensions 
-                        ? `${asset.metadata.dimensions.width} × ${asset.metadata.dimensions.height} px`
-                        : asset?.metadata?.size ? `${(asset.metadata.size / 1024 / 1024).toFixed(2)} MB` : "--"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2.5">
-                  <label className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.2em] ml-1">Internal Reference</label>
-                  <div className="flex items-center gap-4 p-4 rounded-xl border bg-muted/20 overflow-hidden">
-                    <FileText className="w-4.5 h-4.5 text-primary/40 shrink-0" />
-                    <span className="text-[10px] font-mono text-muted-foreground/60 truncate">
-                      {asset?.id || "--"}
-                    </span>
-                  </div>
+                
+                {/* Inspiration Notes (Pure Seamless) */}
+                <div>
+                  {isOwner ? (
+                    <Textarea 
+                      ref={memoRef}
+                      value={localMemo}
+                      onChange={(e) => {
+                        setLocalMemo(e.target.value);
+                        setSaveStatus("editing");
+                      }}
+                      placeholder="Record your inspirations or notes here..." 
+                      className="resize-none text-base leading-relaxed text-muted-foreground !bg-transparent !border-transparent !shadow-none focus-visible:!ring-0 focus-visible:!border-border hover:!bg-secondary/50 !p-2 -ml-2 min-h-[40px] transition-colors duration-200 font-sans overflow-hidden h-auto"
+                      onBlur={(e) => handleAutoSave("memo", e.target.value)}
+                      rows={1}
+                    />
+                  ) : (
+                    <p className="min-h-[40px] p-2 -ml-2 text-base leading-relaxed font-sans text-muted-foreground whitespace-pre-wrap">
+                      {localMemo || "No notes recorded for this reference."}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Taxonomy Stack */}
-              {asset?.tags?.length > 0 && (
-                <div className="mt-auto pt-8 border-t border-border/10">
-                  <label className="block text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.2em] mb-4 ml-1">System Keywords</label>
-                  <div className="flex flex-wrap gap-2">
-                    {asset.tags.map(t => (
-                      <Badge key={t} variant="outline" className="px-3 py-1 text-[11px] font-bold border-border/60 hover:bg-muted uppercase">
-                        {t}
+              {/* C. Collection / Folder (Pure Seamless) */}
+              <div className="space-y-1 opacity-80">
+ 
+                {isCreatingCollection ? (
+                  <div className="animate-in fade-in slide-in-from-top-1 duration-300">
+                    <Input 
+                      autoFocus
+                      placeholder="Enter collection name..."
+                      value={newCollectionName}
+                      onChange={(e) => setNewCollectionName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.nativeEvent.isComposing) return;
+                        if (e.key === "Enter") handleCreateAndFork();
+                        if (e.key === "Escape") setIsCreatingCollection(false);
+                      }}
+                      className="w-full h-10 !bg-secondary/20 !border-border/30 focus-visible:!ring-1 focus-visible:!ring-blue-500/50 text-sm font-sans"
+                    />
+                    <p className="text-sm text-muted-foreground/40 mt-1.5 ml-1 italic">Press Enter to create and fork, Esc to cancel</p>
+                  </div>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        disabled={forkStatus !== "idle" || !isOwner}
+                        className={`w-full h-10 !px-2 -ml-2 !border-transparent !bg-transparent hover:!bg-secondary/50 font-semibold font-sans text-sm hover:text-foreground transition-all duration-200 shadow-none focus:ring-0 flex items-center justify-between group ${collections.length === 0 ? 'text-muted-foreground/30' : 'text-muted-foreground/60'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <FolderOpen className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100" />
+                          <span className="truncate">
+                            {collections.length === 0 ? "생성된 콜렉션이 없습니다" : 
+                            forkStatus === "forking" ? "Processing..." : 
+                            forkStatus === "forked" ? "✓ Updated" : 
+                            (asset.collection_ids?.length > 0 ? `${asset.collection_ids.length} Collections` : "Add to collection...")}
+                          </span>
+                        </div>
+                        <ChevronDown className="w-3 h-3 opacity-20" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-[200px] font-sans border-border/10 bg-background/95 backdrop-blur-md">
+                      <DropdownMenuItem 
+                        onClick={() => setIsCreatingCollection(true)}
+                        className="text-sm font-bold text-blue-500 hover:text-blue-600 focus:text-blue-600 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-2" /> 새 콜렉션 만들기
+                      </DropdownMenuItem>
+                      {collections.length > 0 && <div className="h-px bg-border/20 my-1" />}
+                      {collections.map(c => {
+                        const isMapped = asset.collection_ids?.includes(c.id);
+                        return (
+                          <DropdownMenuItem 
+                            key={c.id} 
+                            onClick={() => handleToggleFork(c.id)}
+                            className="text-sm tracking-wider flex items-center justify-between cursor-pointer"
+                          >
+                            <span>{c.name}</span>
+                            {isMapped && <Check className="w-3 h-3 text-blue-500" strokeWidth={3} />}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
+                {/* Collection Badges (Hybrid UX) */}
+                {asset.collection_ids?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2 transition-all animate-in fade-in slide-in-from-top-1 duration-300">
+                    {collections.filter(c => asset.collection_ids.includes(c.id)).map(col => (
+                      <Badge 
+                        key={col.id} 
+                        variant="secondary" 
+                        className="h-6 px-2 flex items-center gap-1.5 bg-secondary/30 hover:bg-secondary/50 border-transparent text-sm font-sans font-medium text-muted-foreground hover:text-foreground transition-all group/badge"
+                      >
+                        <Folder className="w-3 h-3 opacity-40 group-hover/badge:opacity-100" />
+                        <span className="max-w-[80px] truncate">{col.name}</span>
+                        {isOwner && (
+                          <button 
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleToggleFork(col.id); }}
+                            className="ml-0.5 p-0.5 rounded-sm hover:bg-destructive/10 hover:text-destructive opacity-40 group-hover/badge:opacity-100 transition-all cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        )}
                       </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* D. Taxonomy & Tags (Pure Seamless) */}
+              <div className="space-y-2.5 mt-4">
+                <label className="text-sm font-medium text-muted-foreground/20 ml-0.5 font-sans">Tags</label>
+                <div className="space-y-3">
+                  {isOwner && (
+                    <Input 
+                      placeholder="Add a tag..." 
+                      className="h-10 !bg-transparent !border-transparent !shadow-none hover:!bg-secondary/50 focus-visible:!border-border focus-visible:!ring-0 font-sans text-sm !px-2 transition-all duration-200 focus:placeholder:text-transparent" 
+                      onKeyDown={(e) => {
+                        if (e.nativeEvent.isComposing) return;
+                        if (e.key === "Enter") {
+                          handleAddTag(e.target.value);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                  )}
+                  <div className="flex flex-wrap gap-1.5 px-0.5">
+                    {localTags.length > 0 ? localTags.map(t => (
+                      <Badge key={t} variant="outline" className="group rounded-none px-2 py-0.5 text-sm font-medium border-border/30 bg-muted/10 text-muted-foreground/60 font-sans flex items-center gap-1.5">
+                        {t}
+                        {isOwner && (
+                          <button 
+                            type="button" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleRemoveTag(t);
+                            }}
+                            className="ml-1 p-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive/20 hover:text-destructive pointer-events-auto cursor-pointer flex items-center justify-center shrink-0"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </Badge>
+                    )) : (
+                      <span className="text-sm text-muted-foreground/20 italic">No tags associated.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-4" /> {/* Spacer */}
+
+              {/* E. Color Palette (Imagery Only) */}
+              {asset?.type?.startsWith('image/') && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-muted-foreground/20 tracking-[0.2em] ml-0.5 font-sans">Visual Palette</label>
+                    <Palette className="w-3.5 h-3.5 text-muted-foreground/20" />
+                  </div>
+                  <div className="flex gap-1.5 p-3 rounded-lg border border-border/10 bg-muted/5">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex-1 aspect-[4/3] rounded-sm bg-foreground/5 animate-pulse" />
                     ))}
                   </div>
                 </div>
               )}
+
+
+              {/* Action: Download Master */}
+              <div className="mt-auto pt-6 border-t border-border/10">
+                <Button asChild className="w-full font-bold h-14 shadow-2xl rounded-2xl" size="lg">
+                  <a href={asset?.original_url} target="_blank" rel="noopener noreferrer" download>
+                    <Download className="w-5 h-5 mr-3" strokeWidth={2.5} />
+                    Download Master Reference
+                  </a>
+                </Button>
+              </div>
             </div>
             
             {/* Mobile Close (Extra redundancy for UX) */}
             <div className="md:hidden p-4 pt-0">
-               <Button variant="ghost" className="w-full text-muted-foreground text-xs" onClick={() => setSelectedAssetId(null)}>
+               <Button variant="ghost" className="w-full text-muted-foreground text-sm" onClick={() => setSelectedAssetId(null)}>
                   Close Viewer
                </Button>
             </div>
